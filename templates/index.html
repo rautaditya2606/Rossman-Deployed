@@ -3,21 +3,26 @@
 
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Rossmann Predictor</title>
     <style>
+        *, *::before, *::after { box-sizing: border-box; }
+
         body {
             font-family: Arial, sans-serif;
             background-color: #f5f7fa;
-            padding: 40px;
+            padding: clamp(16px, 4vw, 40px);
+            line-height: 1.5;
         }
 
         h1 {
             text-align: center;
             color: #333;
+            margin-bottom: 24px;
         }
 
         form {
-            max-width: 400px;
+            max-width: 100%;
             margin: auto;
             background: #ffffff;
             padding: 30px;
@@ -118,6 +123,67 @@
             margin-bottom: 20px;
             color: #444;
         }
+
+        /* Layout: form left, suggestions right */
+        .content-grid {
+            display: block;
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+
+        .left-column {
+            width: 100%;
+        }
+
+        .suggestion-box {
+            background: #ffffff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            margin: 24px 0 0;
+        }
+
+        .code-block {
+            background: #f0f0f0;
+            padding: 12px;
+            border-radius: 6px;
+            overflow-x: auto;
+            position: relative;
+        }
+
+        .copy-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: #007BFF;
+            color: white;
+            border: none;
+            padding: 6px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        @media (min-width: 900px) {
+            .content-grid {
+                display: flex;
+                gap: 32px;
+                align-items: flex-start;
+            }
+
+            .left-column {
+                flex: 0 0 clamp(340px, 36vw, 440px);
+                max-width: 520px;
+            }
+
+            .content-grid form {
+                margin: 0;
+            }
+
+            .suggestion-box {
+                flex: 1;
+                margin: 0;
+            }
+        }
     </style>
 </head>
 
@@ -125,50 +191,76 @@
 
     <h1>Rossmann Sales Predictor</h1>
 
-    <form method="POST">
-        <label>Store ID:
-            <input type="number" name="Store" placeholder="1–1115" min="1" max="1115" required>
-        </label>
+    <div class="content-grid">
+        <div class="left-column">
+            <form method="POST">
+                <label>Store ID:
+                    <input type="number" name="Store" placeholder="1–1115" min="1" max="1115" required>
+                </label>
 
 
-        <label>Date:
-            <input type="date" name="Date" required>
-        </label>
+                <label>Date:
+                    <input type="date" name="Date" required>
+                </label>
 
-        <label class="switch-label">Promo Active:
-            <input type="hidden" name="Promo" value="0">
-            <label class="switch">
-                <input type="checkbox" name="Promo" value="1">
-                <span class="slider"></span>
-            </label>
-        </label>
+                <label class="switch-label">Promo Active:
+                    <input type="hidden" name="Promo" value="0">
+                    <label class="switch">
+                        <input type="checkbox" name="Promo" value="1">
+                        <span class="slider"></span>
+                    </label>
+                </label>
 
-        <label class="switch-label">School Holiday On:
-            <input type="hidden" name="SchoolHoliday" value="0">
-            <label class="switch">
-                <input type="checkbox" name="SchoolHoliday" value="1">
-                <span class="slider"></span>
-            </label>
-        </label>
+                <label class="switch-label">School Holiday On:
+                    <input type="hidden" name="SchoolHoliday" value="0">
+                    <label class="switch">
+                        <input type="checkbox" name="SchoolHoliday" value="1">
+                        <span class="slider"></span>
+                    </label>
+                </label>
 
 
-        <label>State Holiday:
-            <select name="StateHoliday" required>
-                <option value="0">None</option>
-                <option value="a">Public Holiday</option>
-                <option value="b">Easter Holiday</option>
-                <option value="c">Christmas</option>
-            </select>
-        </label>
+                <label>State Holiday:
+                    <select name="StateHoliday" required>
+                        <option value="0">None</option>
+                        <option value="a">Public Holiday</option>
+                        <option value="b">Easter Holiday</option>
+                        <option value="c">Christmas</option>
+                    </select>
+                </label>
 
-        <input type="submit" value="Predict">
-    </form>
+                <input type="submit" value="Predict">
+            </form>
 
-    {% if prediction %}
-    <div class="result">
-        <h3>Predicted Sales: {{ prediction }}</h3>
+            {% if prediction %}
+            <div class="result">
+                <h3>Predicted Sales: {{ prediction }}</h3>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="suggestion-box">
+            <h3>Test the API via cURL</h3>
+            <pre class="code-block"><code id="curlCommand">curl -X POST "https://rossman-sales-predictor.onrender.com/api/predictor" \
+-H "Content-Type: application/json" \
+-d '{"Store": 1, "Promo": 1, "Date": "2015-07-31", "SchoolHoliday": 0, "StateHoliday": "0"}'</code>
+                <button class="copy-btn" onclick="copyCurl()">Copy</button>
+            </pre>
+            <p style="margin-top: 10px; font-size: 14px;">You can also test online via <a href="https://reqbin.com/curl" target="_blank">ReqBin</a>.</p>
+        </div>
     </div>
-    {% endif %}
+
+    <script>
+    function copyCurl() {
+        const text = document.getElementById("curlCommand").innerText;
+        navigator.clipboard.writeText(text).then(() => {
+            alert("cURL command copied to clipboard!");
+        }).catch(err => {
+            console.error("Failed to copy: ", err);
+        });
+    }
+    </script>
+
 
 </body>
 
