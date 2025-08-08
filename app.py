@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, jsonify
 import joblib
 from utils import decode_input
 
@@ -33,6 +33,23 @@ def index():
         prediction = model.predict(x_decoded)[0]
 
     return render_template('index.html', prediction=prediction)
+
+
+@app.route('/api/predictor', methods=['POST'])
+def api_predictor():
+    try:
+        data = request.get_json(force=True)
+        decoded_df = decode_input(data, store_static_dict)
+        decoded_df[numeric_cols] = scaler.transform(decoded_df[numeric_cols])
+        decoded_df[encoded_cols] = encoder.transform(decoded_df[categorical_cols])
+        x_decoded = decoded_df[numeric_cols + encoded_cols]
+        prediction = float(model.predict(x_decoded)[0])
+        return jsonify({'prediction': prediction})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+    
+
 
 if __name__ == '__main__':
     app.run(debug=True)
