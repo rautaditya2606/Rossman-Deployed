@@ -321,20 +321,169 @@
         }
 
         @media (max-width: 768px) {
+            body {
+                padding: 1.5rem 1rem;
+                background-image: 
+                    repeating-linear-gradient(0deg, transparent, transparent 15px, var(--border) 15px, var(--border) 16px),
+                    repeating-linear-gradient(90deg, transparent, transparent 15px, var(--border) 15px, var(--border) 16px);
+            }
+
             h1 {
                 font-size: 2.5rem;
+                line-height: 1;
+            }
+
+            .subtitle {
+                font-size: 0.75rem;
+            }
+
+            header {
+                margin-bottom: 2.5rem;
+                padding-bottom: 1.5rem;
+            }
+
+            .content-grid {
+                gap: 2rem;
             }
 
             .card {
                 box-shadow: 4px 4px 0 var(--ink);
             }
 
+            .card-header {
+                padding: 1rem 1.5rem;
+                font-size: 0.75rem;
+            }
+
             .card-body {
                 padding: 1.5rem;
             }
 
-            body {
-                padding: 2rem 1rem;
+            form label {
+                font-size: 0.7rem;
+                margin-bottom: 0.6rem;
+            }
+
+            input[type="number"],
+            input[type="date"],
+            select {
+                padding: 0.875rem 1rem;
+                margin-bottom: 1.5rem;
+                font-size: 1rem;
+            }
+
+            select {
+                background-position: right 0.75rem center;
+                padding-right: 2.5rem;
+            }
+
+            .switch-group {
+                gap: 0.75rem;
+                margin-bottom: 1.5rem;
+            }
+
+            .switch-label {
+                padding: 1rem;
+                font-size: 0.7rem;
+            }
+
+            .switch {
+                width: 52px;
+                height: 28px;
+            }
+
+            .slider:before {
+                height: 18px;
+                width: 18px;
+                left: 3px;
+                bottom: 3px;
+            }
+
+            input:checked + .slider:before {
+                transform: translateX(24px);
+            }
+
+            input[type="submit"] {
+                padding: 1.25rem;
+                font-size: 0.8rem;
+                box-shadow: 4px 4px 0 var(--ink);
+            }
+
+            input[type="submit"]:hover {
+                transform: translate(-2px, -2px);
+                box-shadow: 6px 6px 0 var(--ink);
+            }
+
+            input[type="submit"]:active {
+                transform: translate(0, 0);
+                box-shadow: 2px 2px 0 var(--ink);
+            }
+
+            .result {
+                margin-top: 2rem;
+                padding: 1.5rem;
+                box-shadow: 4px 4px 0 var(--ink);
+            }
+
+            .result h3 {
+                font-size: 1.2rem;
+            }
+
+            .api-card h3 {
+                font-size: 0.75rem;
+                margin-bottom: 1rem;
+            }
+
+            .code-block {
+                padding: 1rem;
+                font-size: 0.7rem;
+                line-height: 1.6;
+                margin: 1rem 0;
+                box-shadow: 3px 3px 0 var(--ink);
+            }
+
+            .copy-btn {
+                top: 0.75rem;
+                right: 0.75rem;
+                padding: 0.4rem 0.75rem;
+                font-size: 0.65rem;
+            }
+
+            .api-card p {
+                font-size: 0.9rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            h1 {
+                font-size: 2rem;
+            }
+
+            .subtitle {
+                font-size: 0.7rem;
+            }
+
+            .card-body {
+                padding: 1.25rem;
+            }
+
+            input[type="number"],
+            input[type="date"],
+            select {
+                padding: 0.75rem 0.875rem;
+                font-size: 0.95rem;
+            }
+
+            .code-block {
+                font-size: 0.65rem;
+                padding: 0.875rem;
+            }
+
+            .copy-btn {
+                position: static;
+                display: block;
+                width: 100%;
+                margin-top: 0.75rem;
             }
         }
 
