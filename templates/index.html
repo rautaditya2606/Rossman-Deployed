@@ -1,658 +1,680 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Rossmann Predictor</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Crimson+Pro:wght@400;600;700&display=swap');
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        :root {
-            --ink: #1a1a1a;
-            --paper: #fdfbf7;
-            --accent: #d84315;
-            --muted: #6b6b6b;
-            --border: #e0ddd6;
-            --success: #2e7d32;
-            --code-bg: #2b2b2b;
-        }
-
-        body {
-            font-family: 'Crimson Pro', serif;
-            background: var(--paper);
-            color: var(--ink);
-            line-height: 1.6;
-            padding: 3rem 1.5rem;
-            background-image: 
-                repeating-linear-gradient(0deg, transparent, transparent 31px, var(--border) 31px, var(--border) 32px),
-                repeating-linear-gradient(90deg, transparent, transparent 31px, var(--border) 31px, var(--border) 32px);
-        }
-
-        .container {
-            max-width: 1100px;
-            margin: 0 auto;
-        }
-
-        header {
-            margin-bottom: 4rem;
-            border-bottom: 3px solid var(--ink);
-            padding-bottom: 2rem;
-        }
-
-        h1 {
-            font-size: 4rem;
-            font-weight: 700;
-            letter-spacing: -0.02em;
-            line-height: 0.95;
-            margin-bottom: 0.5rem;
-            color: var(--ink);
-        }
-
-        .subtitle {
-            font-family: 'IBM Plex Mono', monospace;
-            font-size: 0.9rem;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            color: var(--muted);
-        }
-
+      @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Crimson+Pro:wght@400;600;700&display=swap');
+      
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      
+      :root {
+        --ink: #1a1a1a;
+        --paper: #fdfbf7;
+        --accent: #d84315;
+        --muted: #6b6b6b;
+        --border: #e0ddd6;
+        --success: #2e7d32;
+        --code-bg: #2b2b2b;
+      }
+      
+      body {
+        font-family: 'Crimson Pro', serif;
+        background: var(--paper);
+        color: var(--ink);
+        line-height: 1.6;
+        padding: 3rem 1.5rem;
+        background-image: repeating-linear-gradient(0deg, transparent, transparent 31px, var(--border) 31px, var(--border) 32px), repeating-linear-gradient(90deg, transparent, transparent 31px, var(--border) 31px, var(--border) 32px);
+      }
+      
+      .container {
+        max-width: 1100px;
+        margin: 0 auto;
+      }
+      
+      header {
+        margin-bottom: 4rem;
+        border-bottom: 3px solid var(--ink);
+        padding-bottom: 2rem;
+      }
+      
+      h1 {
+        font-size: 4rem;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        line-height: 0.95;
+        margin-bottom: 0.5rem;
+        color: var(--ink);
+      }
+      
+      .subtitle {
+        font-family: 'IBM Plex Mono', monospace;
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--muted);
+      }
+      
+      .content-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 3rem;
+      }
+      
+      @media (min-width: 900px) {
         .content-grid {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 3rem;
+          grid-template-columns: 1.3fr 1fr;
+          align-items: start;
         }
-
-        @media (min-width: 900px) {
-            .content-grid {
-                grid-template-columns: 1.3fr 1fr;
-                align-items: start;
-            }
+      }
+      
+      .card {
+        background: white;
+        border: 2px solid var(--ink);
+        box-shadow: 8px 8px 0 var(--ink);
+        position: relative;
+      }
+      
+      .card-header {
+        background: var(--ink);
+        color: var(--paper);
+        padding: 1.5rem 2rem;
+        font-family: 'IBM Plex Mono', monospace;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.15em;
+        border-bottom: 2px solid var(--ink);
+      }
+      
+      .card-body {
+        padding: 2.5rem;
+      }
+      
+      form label {
+        display: block;
+        font-family: 'IBM Plex Mono', monospace;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        margin-bottom: 0.75rem;
+        color: var(--ink);
+        font-weight: 600;
+      }
+      
+      input[type='number'],
+      input[type='date'],
+      select {
+        width: 100%;
+        padding: 1rem 1.25rem;
+        margin-bottom: 2rem;
+        border: 2px solid var(--ink);
+        background: var(--paper);
+        font-family: 'Crimson Pro', serif;
+        font-size: 1.1rem;
+        color: var(--ink);
+        transition: all 0.2s;
+        appearance: none;
+      }
+      
+      input[type='number']:focus,
+      input[type='date']:focus,
+      select:focus {
+        outline: none;
+        box-shadow: 4px 4px 0 var(--accent);
+        transform: translate(-2px, -2px);
+      }
+      
+      select {
+        background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L6 6L11 1' stroke='%231a1a1a' stroke-width='2'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 1rem center;
+        padding-right: 3rem;
+      }
+      
+      .switch-group {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 1rem;
+        margin-bottom: 2rem;
+      }
+      
+      .switch-label {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 1.25rem;
+        border: 2px solid var(--ink);
+        background: var(--paper);
+        cursor: pointer;
+        transition: all 0.2s;
+        font-family: 'IBM Plex Mono', monospace;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        font-weight: 600;
+      }
+      
+      .switch-label:hover {
+        box-shadow: 4px 4px 0 var(--border);
+        transform: translate(-2px, -2px);
+      }
+      
+      .switch {
+        position: relative;
+        width: 60px;
+        height: 32px;
+        flex-shrink: 0;
+      }
+      
+      .switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+      
+      .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: var(--paper);
+        border: 2px solid var(--ink);
+        transition: 0.2s;
+      }
+      
+      .slider:before {
+        position: absolute;
+        content: '';
+        height: 20px;
+        width: 20px;
+        left: 4px;
+        bottom: 4px;
+        background: var(--ink);
+        transition: 0.2s;
+      }
+      
+      input:checked + .slider {
+        background: var(--accent);
+      }
+      
+      input:checked + .slider:before {
+        transform: translateX(28px);
+        background: white;
+      }
+      
+      input[type='submit'] {
+        width: 100%;
+        background: var(--accent);
+        color: white;
+        border: 2px solid var(--ink);
+        padding: 1.5rem;
+        font-family: 'IBM Plex Mono', monospace;
+        font-size: 0.9rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.15em;
+        cursor: pointer;
+        transition: all 0.2s;
+        box-shadow: 6px 6px 0 var(--ink);
+      }
+      
+      input[type='submit']:hover {
+        transform: translate(-3px, -3px);
+        box-shadow: 9px 9px 0 var(--ink);
+      }
+      
+      input[type='submit']:active {
+        transform: translate(0, 0);
+        box-shadow: 3px 3px 0 var(--ink);
+      }
+      
+      .result {
+        margin-top: 2.5rem;
+        padding: 2rem;
+        background: var(--success);
+        border: 2px solid var(--ink);
+        text-align: center;
+        box-shadow: 6px 6px 0 var(--ink);
+      }
+      
+      .result h3 {
+        font-family: 'IBM Plex Mono', monospace;
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: white;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      
+      .api-card h3 {
+        font-family: 'IBM Plex Mono', monospace;
+        font-size: 0.85rem;
+        font-weight: 600;
+        margin-bottom: 1.5rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+      }
+      
+      .copy-section {
+        margin: 1.5rem 0;
+      }
+      
+      .copy-btn {
+        width: 100%;
+        background: var(--paper);
+        color: var(--ink);
+        border: 2px solid var(--ink);
+        padding: 1rem 1.5rem;
+        font-family: 'IBM Plex Mono', monospace;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-weight: 600;
+        box-shadow: 4px 4px 0 var(--ink);
+      }
+      
+      .copy-btn:hover {
+        transform: translate(-2px, -2px);
+        box-shadow: 6px 6px 0 var(--ink);
+      }
+      
+      .copy-btn:active {
+        transform: translate(0, 0);
+        box-shadow: 2px 2px 0 var(--ink);
+      }
+      
+      .copy-btn.success {
+        background: var(--success);
+        color: white;
+      }
+      
+      .api-card p {
+        font-size: 1rem;
+        color: var(--muted);
+        line-height: 1.7;
+      }
+      
+      .api-card a {
+        color: var(--accent);
+        text-decoration: none;
+        border-bottom: 2px solid var(--accent);
+        font-weight: 600;
+        transition: all 0.2s;
+      }
+      
+      .api-card a:hover {
+        background: var(--accent);
+        color: white;
+        padding: 0 0.25rem;
+      }
+      
+      @media (max-width: 768px) {
+        body {
+          padding: 1.5rem 1rem;
+          background-image: repeating-linear-gradient(0deg, transparent, transparent 15px, var(--border) 15px, var(--border) 16px), repeating-linear-gradient(90deg, transparent, transparent 15px, var(--border) 15px, var(--border) 16px);
         }
-
+      
+        h1 {
+          font-size: 2.5rem;
+          line-height: 1;
+        }
+      
+        .subtitle {
+          font-size: 0.75rem;
+        }
+      
+        header {
+          margin-bottom: 2.5rem;
+          padding-bottom: 1.5rem;
+        }
+      
+        .content-grid {
+          gap: 2rem;
+        }
+      
         .card {
-            background: white;
-            border: 2px solid var(--ink);
-            box-shadow: 8px 8px 0 var(--ink);
-            position: relative;
+          box-shadow: 4px 4px 0 var(--ink);
         }
-
+      
         .card-header {
-            background: var(--ink);
-            color: var(--paper);
-            padding: 1.5rem 2rem;
-            font-family: 'IBM Plex Mono', monospace;
-            font-size: 0.85rem;
-            text-transform: uppercase;
-            letter-spacing: 0.15em;
-            border-bottom: 2px solid var(--ink);
+          padding: 1rem 1.5rem;
+          font-size: 0.75rem;
         }
-
+      
         .card-body {
-            padding: 2.5rem;
+          padding: 1.5rem;
         }
-
+      
         form label {
-            display: block;
-            font-family: 'IBM Plex Mono', monospace;
-            font-size: 0.75rem;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            margin-bottom: 0.75rem;
-            color: var(--ink);
-            font-weight: 600;
+          font-size: 0.7rem;
+          margin-bottom: 0.6rem;
         }
-
-        input[type="number"],
-        input[type="date"],
+      
+        input[type='number'],
+        input[type='date'],
         select {
-            width: 100%;
-            padding: 1rem 1.25rem;
-            margin-bottom: 2rem;
-            border: 2px solid var(--ink);
-            background: var(--paper);
-            font-family: 'Crimson Pro', serif;
-            font-size: 1.1rem;
-            color: var(--ink);
-            transition: all 0.2s;
-            appearance: none;
+          padding: 0.875rem 1rem;
+          margin-bottom: 1.5rem;
+          font-size: 1rem;
         }
-
-        input[type="number"]:focus,
-        input[type="date"]:focus,
-        select:focus {
-            outline: none;
-            box-shadow: 4px 4px 0 var(--accent);
-            transform: translate(-2px, -2px);
-        }
-
+      
         select {
-            background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L6 6L11 1' stroke='%231a1a1a' stroke-width='2'/%3E%3C/svg%3E");
-            background-repeat: no-repeat;
-            background-position: right 1rem center;
-            padding-right: 3rem;
+          background-position: right 0.75rem center;
+          padding-right: 2.5rem;
         }
-
+      
         .switch-group {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 1rem;
-            margin-bottom: 2rem;
+          gap: 0.75rem;
+          margin-bottom: 1.5rem;
         }
-
+      
         .switch-label {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 1.25rem;
-            border: 2px solid var(--ink);
-            background: var(--paper);
-            cursor: pointer;
-            transition: all 0.2s;
-            font-family: 'IBM Plex Mono', monospace;
-            font-size: 0.75rem;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            font-weight: 600;
+          padding: 1rem;
+          font-size: 0.7rem;
         }
-
-        .switch-label:hover {
-            box-shadow: 4px 4px 0 var(--border);
-            transform: translate(-2px, -2px);
-        }
-
+      
         .switch {
-            position: relative;
-            width: 60px;
-            height: 32px;
-            flex-shrink: 0;
+          width: 52px;
+          height: 28px;
         }
-
-        .switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
-
-        .slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: var(--paper);
-            border: 2px solid var(--ink);
-            transition: 0.2s;
-        }
-
+      
         .slider:before {
-            position: absolute;
-            content: "";
-            height: 20px;
-            width: 20px;
-            left: 4px;
-            bottom: 4px;
-            background: var(--ink);
-            transition: 0.2s;
+          height: 18px;
+          width: 18px;
+          left: 3px;
+          bottom: 3px;
         }
-
-        input:checked + .slider {
-            background: var(--accent);
-        }
-
+      
         input:checked + .slider:before {
-            transform: translateX(28px);
-            background: white;
+          transform: translateX(24px);
         }
-
-        input[type="submit"] {
-            width: 100%;
-            background: var(--accent);
-            color: white;
-            border: 2px solid var(--ink);
-            padding: 1.5rem;
-            font-family: 'IBM Plex Mono', monospace;
-            font-size: 0.9rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.15em;
-            cursor: pointer;
-            transition: all 0.2s;
-            box-shadow: 6px 6px 0 var(--ink);
+      
+        input[type='submit'] {
+          padding: 1.25rem;
+          font-size: 0.8rem;
+          box-shadow: 4px 4px 0 var(--ink);
         }
-
-        input[type="submit"]:hover {
-            transform: translate(-3px, -3px);
-            box-shadow: 9px 9px 0 var(--ink);
+      
+        input[type='submit']:hover {
+          transform: translate(-2px, -2px);
+          box-shadow: 6px 6px 0 var(--ink);
         }
-
-        input[type="submit"]:active {
-            transform: translate(0, 0);
-            box-shadow: 3px 3px 0 var(--ink);
+      
+        input[type='submit']:active {
+          transform: translate(0, 0);
+          box-shadow: 2px 2px 0 var(--ink);
         }
-
+      
         .result {
-            margin-top: 2.5rem;
-            padding: 2rem;
-            background: var(--success);
-            border: 2px solid var(--ink);
-            text-align: center;
-            box-shadow: 6px 6px 0 var(--ink);
+          margin-top: 2rem;
+          padding: 1.5rem;
+          box-shadow: 4px 4px 0 var(--ink);
         }
-
+      
         .result h3 {
-            font-family: 'IBM Plex Mono', monospace;
-            font-size: 1.5rem;
-            font-weight: 600;
-            color: white;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
+          font-size: 1.2rem;
         }
-
+      
         .api-card h3 {
-            font-family: 'IBM Plex Mono', monospace;
-            font-size: 0.85rem;
-            font-weight: 600;
-            margin-bottom: 1.5rem;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
+          font-size: 0.75rem;
+          margin-bottom: 1rem;
         }
-
-        .code-block {
-            position: relative;
-            background: var(--code-bg);
-            color: #a5d6a7;
-            padding: 1.5rem;
-            border: 2px solid var(--ink);
-            overflow-x: auto;
-            font-family: 'IBM Plex Mono', monospace;
-            font-size: 0.8rem;
-            line-height: 1.8;
-            margin: 1.5rem 0;
-            box-shadow: 4px 4px 0 var(--ink);
-        }
-
+      
         .copy-btn {
-            position: absolute;
-            top: 1rem;
-            right: 1rem;
-            background: var(--paper);
-            color: var(--ink);
-            border: 2px solid var(--ink);
-            padding: 0.5rem 1rem;
-            font-family: 'IBM Plex Mono', monospace;
-            font-size: 0.7rem;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            cursor: pointer;
-            transition: all 0.2s;
-            font-weight: 600;
+          padding: 0.875rem 1rem;
+          font-size: 0.75rem;
         }
-
-        .copy-btn:hover {
-            background: var(--accent);
-            color: white;
-        }
-
+      
         .api-card p {
-            font-size: 1rem;
-            color: var(--muted);
-            line-height: 1.7;
+          font-size: 0.9rem;
         }
-
-        .api-card a {
-            color: var(--accent);
-            text-decoration: none;
-            border-bottom: 2px solid var(--accent);
-            font-weight: 600;
-            transition: all 0.2s;
+      }
+      
+      @media (max-width: 480px) {
+        h1 {
+          font-size: 2rem;
         }
-
-        .api-card a:hover {
-            background: var(--accent);
-            color: white;
-            padding: 0 0.25rem;
+      
+        .subtitle {
+          font-size: 0.7rem;
         }
-
-        @media (max-width: 768px) {
-            body {
-                padding: 1.5rem 1rem;
-                background-image: 
-                    repeating-linear-gradient(0deg, transparent, transparent 15px, var(--border) 15px, var(--border) 16px),
-                    repeating-linear-gradient(90deg, transparent, transparent 15px, var(--border) 15px, var(--border) 16px);
-            }
-
-            h1 {
-                font-size: 2.5rem;
-                line-height: 1;
-            }
-
-            .subtitle {
-                font-size: 0.75rem;
-            }
-
-            header {
-                margin-bottom: 2.5rem;
-                padding-bottom: 1.5rem;
-            }
-
-            .content-grid {
-                gap: 2rem;
-            }
-
-            .card {
-                box-shadow: 4px 4px 0 var(--ink);
-            }
-
-            .card-header {
-                padding: 1rem 1.5rem;
-                font-size: 0.75rem;
-            }
-
-            .card-body {
-                padding: 1.5rem;
-            }
-
-            form label {
-                font-size: 0.7rem;
-                margin-bottom: 0.6rem;
-            }
-
-            input[type="number"],
-            input[type="date"],
-            select {
-                padding: 0.875rem 1rem;
-                margin-bottom: 1.5rem;
-                font-size: 1rem;
-            }
-
-            select {
-                background-position: right 0.75rem center;
-                padding-right: 2.5rem;
-            }
-
-            .switch-group {
-                gap: 0.75rem;
-                margin-bottom: 1.5rem;
-            }
-
-            .switch-label {
-                padding: 1rem;
-                font-size: 0.7rem;
-            }
-
-            .switch {
-                width: 52px;
-                height: 28px;
-            }
-
-            .slider:before {
-                height: 18px;
-                width: 18px;
-                left: 3px;
-                bottom: 3px;
-            }
-
-            input:checked + .slider:before {
-                transform: translateX(24px);
-            }
-
-            input[type="submit"] {
-                padding: 1.25rem;
-                font-size: 0.8rem;
-                box-shadow: 4px 4px 0 var(--ink);
-            }
-
-            input[type="submit"]:hover {
-                transform: translate(-2px, -2px);
-                box-shadow: 6px 6px 0 var(--ink);
-            }
-
-            input[type="submit"]:active {
-                transform: translate(0, 0);
-                box-shadow: 2px 2px 0 var(--ink);
-            }
-
-            .result {
-                margin-top: 2rem;
-                padding: 1.5rem;
-                box-shadow: 4px 4px 0 var(--ink);
-            }
-
-            .result h3 {
-                font-size: 1.2rem;
-            }
-
-            .api-card h3 {
-                font-size: 0.75rem;
-                margin-bottom: 1rem;
-            }
-
-            .code-block {
-                padding: 1rem;
-                font-size: 0.7rem;
-                line-height: 1.6;
-                margin: 1rem 0;
-                box-shadow: 3px 3px 0 var(--ink);
-            }
-
-            .copy-btn {
-                top: 0.75rem;
-                right: 0.75rem;
-                padding: 0.4rem 0.75rem;
-                font-size: 0.65rem;
-            }
-
-            .api-card p {
-                font-size: 0.9rem;
-            }
+      
+        .card-body {
+          padding: 1.25rem;
         }
-
-        @media (max-width: 480px) {
-            h1 {
-                font-size: 2rem;
-            }
-
-            .subtitle {
-                font-size: 0.7rem;
-            }
-
-            .card-body {
-                padding: 1.25rem;
-            }
-
-            input[type="number"],
-            input[type="date"],
-            select {
-                padding: 0.75rem 0.875rem;
-                font-size: 0.95rem;
-            }
-
-            .code-block {
-                font-size: 0.65rem;
-                padding: 0.875rem;
-            }
-
-            .copy-btn {
-                position: static;
-                display: block;
-                width: 100%;
-                margin-top: 0.75rem;
-            }
+      
+        input[type='number'],
+        input[type='date'],
+        select {
+          padding: 0.75rem 0.875rem;
+          font-size: 0.95rem;
         }
-
-        @media (prefers-reduced-motion: reduce) {
-            * {
-                animation: none !important;
-                transition: none !important;
-            }
+      
+        .copy-btn {
+          padding: 0.75rem;
+          font-size: 0.7rem;
         }
+      }
+      
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          animation: none !important;
+          transition: none !important;
+        }
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <div class="container">
-        <header>
-            <h1>Rossmann<br>Sales Predictor</h1>
-            <p class="subtitle">Machine Learning Forecasting System</p>
-        </header>
+      <header>
+        <h1>Rossmann<br />Sales Predictor</h1>
+        <p class="subtitle">Machine Learning Forecasting System</p>
+      </header>
 
-        <div class="content-grid">
-            <section class="card">
-                <div class="card-header">
-                    Prediction Parameters
-                </div>
-                <div class="card-body">
-                    <form method="POST">
-                        <label>Store ID
-                            <input type="number" name="Store" placeholder="1–1115" min="1" max="1115" required>
-                        </label>
+      <div class="content-grid">
+        <section class="card">
+          <div class="card-header">Prediction Parameters</div>
+          <div class="card-body">
+            <form method="POST">
+              <label>Store ID<input type="number" name="Store" placeholder="1–1115" min="1" max="1115" required /></label>
 
-                        <label>Date
-                            <input type="date" name="Date" id="dateInput" required>
-                        </label>
+              <label>Date<input type="date" name="Date" id="dateInput" required /></label>
 
-                        <div class="switch-group">
-                            <label class="switch-label">
-                                <span>Promo Active</span>
-                                <input type="hidden" name="Promo" value="0">
-                                <span class="switch">
-                                    <input type="checkbox" name="Promo" value="1">
-                                    <span class="slider"></span>
-                                </span>
-                            </label>
+              <div class="switch-group">
+                <label class="switch-label">
+                  <span>Promo Active</span>
+                  <input type="hidden" name="Promo" value="0" />
+                  <span class="switch">
+                    <input type="checkbox" name="Promo" value="1" />
+                    <span class="slider"></span>
+                  </span>
+                </label>
 
-                            <label class="switch-label">
-                                <span>School Holiday</span>
-                                <input type="hidden" name="SchoolHoliday" value="0">
-                                <span class="switch">
-                                    <input type="checkbox" name="SchoolHoliday" value="1">
-                                    <span class="slider"></span>
-                                </span>
-                            </label>
-                        </div>
+                <label class="switch-label">
+                  <span>School Holiday</span>
+                  <input type="hidden" name="SchoolHoliday" value="0" />
+                  <span class="switch">
+                    <input type="checkbox" name="SchoolHoliday" value="1" />
+                    <span class="slider"></span>
+                  </span>
+                </label>
+              </div>
 
-                        <label>State Holiday
-                            <select name="StateHoliday" id="stateHolidaySelect" required>
-                                <option value="0">None</option>
-                                <option value="a">Public Holiday</option>
-                                <option value="b">Easter Holiday</option>
-                                <option value="c">Christmas</option>
-                            </select>
-                        </label>
+              <label>
+                State Holiday<select name="StateHoliday" id="stateHolidaySelect" required>
+                  <option value="0">None</option>
+                  <option value="a">Public Holiday</option>
+                  <option value="b">Easter Holiday</option>
+                  <option value="c">Christmas</option>
+                </select>
+              </label>
 
-                        <input type="submit" value="Generate Prediction">
-                    </form>
+              <input type="submit" value="Generate Prediction" />
+            </form>
 
-                    {% if prediction %}
-                    <div class="result">
-                        <h3>Predicted Sales: {{ prediction }}</h3>
-                    </div>
-                    {% endif %}
-                </div>
-            </section>
+            {% if prediction %}
+              <div class="result">
+                <h3>Predicted Sales: {{ prediction }}</h3>
+              </div>
+            {% endif %}
+          </div>
+        </section>
 
-            <aside class="card api-card">
-                <div class="card-header">
-                    API Access
-                </div>
-                <div class="card-body">
-                    <h3>cURL Request Example</h3>
-                    <pre class="code-block"><code id="curlCommand">curl -X POST "https://rossman-deployed.onrender.com/api/predictor" \
--H "Content-Type: application/json" \
--d '{"Store": 1, "Promo": 1, "Date": "2015-07-31", "SchoolHoliday": 0, "StateHoliday": "0"}'</code><button class="copy-btn" onclick="copyCurl()">Copy</button></pre>
-                    <p>Test online via <a href="https://reqbin.com/curl" target="_blank">ReqBin</a> or your preferred API client.</p>
-                </div>
-            </aside>
-        </div>
+        <aside class="card api-card">
+          <div class="card-header">API Access</div>
+          <div class="card-body">
+            <h3>Copy cURL Command</h3>
+            <div class="copy-section">
+              <button class="copy-btn" id="copyCurlBtn">Copy cURL Command</button>
+            </div>
+            <p>
+              Use this cURL command to make API requests directly. Test online via
+              <a href="https://reqbin.com/curl" target="_blank">ReqBin</a> or your preferred API client.
+            </p>
+          </div>
+        </aside>
+      </div>
     </div>
 
     <script>
-    document.getElementById('dateInput').addEventListener('change', function() {
-        const dateVal = this.value;
-        if (!dateVal) return;
-
-        const date = new Date(dateVal);
-        const year = date.getFullYear();
-        const month = date.getMonth() + 1;
-        const day = date.getDate();
-        const dayOfWeek = date.getDay();
-
-        const stateHolidaySelect = document.getElementById('stateHolidaySelect');
-        let holidayType = '0';
-
+      document.getElementById('dateInput').addEventListener('change', function () {
+        const dateVal = this.value
+        if (!dateVal) return
+      
+        const date = new Date(dateVal)
+        const year = date.getFullYear()
+        const month = date.getMonth() + 1
+        const day = date.getDate()
+        const dayOfWeek = date.getDay()
+      
+        const stateHolidaySelect = document.getElementById('stateHolidaySelect')
+        let holidayType = '0'
+      
         if (month === 12 && (day === 25 || day === 26)) {
-            holidayType = 'c';
+          holidayType = 'c'
         } else {
-            const easter = getEaster(year);
-            const easterSunday = new Date(year, easter.month - 1, easter.day);
-            
-            const goodFriday = new Date(easterSunday);
-            goodFriday.setDate(easterSunday.getDate() - 2);
-
-            const easterMonday = new Date(easterSunday);
-            easterMonday.setDate(easterSunday.getDate() + 1);
-
-            const checkDate = new Date(year, month - 1, day);
-            
-            if (isSameDate(checkDate, goodFriday) || isSameDate(checkDate, easterMonday)) {
-                holidayType = 'b';
-            } else if (dayOfWeek === 0 || dayOfWeek === 6) {
-                holidayType = 'a';
-            }
+          const easter = getEaster(year)
+          const easterSunday = new Date(year, easter.month - 1, easter.day)
+      
+          const goodFriday = new Date(easterSunday)
+          goodFriday.setDate(easterSunday.getDate() - 2)
+      
+          const easterMonday = new Date(easterSunday)
+          easterMonday.setDate(easterSunday.getDate() + 1)
+      
+          const checkDate = new Date(year, month - 1, day)
+      
+          if (isSameDate(checkDate, goodFriday) || isSameDate(checkDate, easterMonday)) {
+            holidayType = 'b'
+          } else if (dayOfWeek === 0 || dayOfWeek === 6) {
+            holidayType = 'a'
+          }
         }
-
-        stateHolidaySelect.value = holidayType;
-
-        const schoolHolidayCheckbox = document.querySelector('input[name="SchoolHoliday"][type="checkbox"]');
+      
+        stateHolidaySelect.value = holidayType
+      
+        const schoolHolidayCheckbox = document.querySelector('input[name="SchoolHoliday"][type="checkbox"]')
         if (holidayType !== '0') {
-            schoolHolidayCheckbox.checked = true;
+          schoolHolidayCheckbox.checked = true
         } else {
-            schoolHolidayCheckbox.checked = false;
+          schoolHolidayCheckbox.checked = false
         }
-    });
-
-    function isSameDate(d1, d2) {
-        return d1.getFullYear() === d2.getFullYear() &&
-               d1.getMonth() === d2.getMonth() &&
-               d1.getDate() === d2.getDate();
-    }
-
-    function getEaster(year) {
-        const f = Math.floor;
-        const G = year % 19;
-        const C = f(year / 100);
-        const H = (C - f(C / 4) - f((8 * C + 13) / 25) + 19 * G + 15) % 30;
-        const I = H - f(H / 28) * (1 - f(29 / (H + 1)) * f((21 - G) / 11));
-        const J = (year + f(year / 4) + I + 2 - C + f(C / 4)) % 7;
-        const L = I - J;
-        const month = 3 + f((L + 40) / 44);
-        const day = L + 28 - 31 * f(month / 4);
-        return { month: month, day: day };
-    }
-
-    function copyCurl() {
-        const text = document.getElementById("curlCommand").innerText;
-        navigator.clipboard.writeText(text).then(() => {
-            const btn = document.querySelector('.copy-btn');
-            const original = btn.textContent;
-            btn.textContent = 'Copied!';
-            btn.style.background = 'var(--success)';
-            btn.style.color = 'white';
-            setTimeout(() => {
-                btn.textContent = original;
-                btn.style.background = '';
-                btn.style.color = '';
-            }, 2000);
-        }).catch(err => {
-            console.error("Failed to copy: ", err);
-        });
-    }
+      })
+      
+      function isSameDate(d1, d2) {
+        return d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth() && d1.getDate() === d2.getDate()
+      }
+      
+      function getEaster(year) {
+        const f = Math.floor
+        const G = year % 19
+        const C = f(year / 100)
+        const H = (C - f(C / 4) - f((8 * C + 13) / 25) + 19 * G + 15) % 30
+        const I = H - f(H / 28) * (1 - f(29 / (H + 1)) * f((21 - G) / 11))
+        const J = (year + f(year / 4) + I + 2 - C + f(C / 4)) % 7
+        const L = I - J
+        const month = 3 + f((L + 40) / 44)
+        const day = L + 28 - 31 * f(month / 4)
+        return { month: month, day: day }
+      }
+      
+      document.getElementById('copyCurlBtn').addEventListener('click', function () {
+        const curlCommand = 'curl -X POST "https://rossman-deployed-v76v.onrender.com/api/predictor" -H "Content-Type: application/json" -d \'{"Store":1,"Promo":1,"Date":"2015-07-31","SchoolHoliday":0,"StateHoliday":"0"}\''
+      
+        // First try using the modern Clipboard API
+        if (navigator.clipboard && window.isSecureContext) {
+          navigator.clipboard
+            .writeText(curlCommand)
+            .then(() => {
+              showCopySuccess(this)
+            })
+            .catch((err) => {
+              console.error('Clipboard API failed:', err)
+              useFallbackCopy(curlCommand, this)
+            })
+        } else {
+          // Use fallback method
+          useFallbackCopy(curlCommand, this)
+        }
+      })
+      
+      function useFallbackCopy(text, button) {
+        // Create a temporary textarea element
+        const textArea = document.createElement('textarea')
+        textArea.value = text
+      
+        // Make it invisible
+        textArea.style.position = 'fixed'
+        textArea.style.left = '-999999px'
+        textArea.style.top = '-999999px'
+        document.body.appendChild(textArea)
+      
+        // Select and copy
+        textArea.focus()
+        textArea.select()
+      
+        try {
+          const successful = document.execCommand('copy')
+          if (successful) {
+            showCopySuccess(button)
+          } else {
+            alert('Copy failed. Please copy manually: ' + text)
+          }
+        } catch (err) {
+          console.error('Fallback copy failed:', err)
+          alert('Copy failed. Please copy manually: ' + text)
+        }
+      
+        // Clean up
+        document.body.removeChild(textArea)
+      }
+      
+      function showCopySuccess(button) {
+        const originalText = button.textContent
+        const originalBg = button.style.background
+        const originalColor = button.style.color
+      
+        button.textContent = 'Copied!'
+        button.style.background = 'var(--success)'
+        button.style.color = 'white'
+        button.disabled = true
+      
+        setTimeout(() => {
+          button.textContent = originalText
+          button.style.background = originalBg
+          button.style.color = originalColor
+          button.disabled = false
+        }, 2000)
+      }
     </script>
-</body>
+  </body>
 </html>
