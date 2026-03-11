@@ -1,10 +1,57 @@
 import pandas as pd
 import numpy as np
+import psycopg2
+import os
+from datetime import datetime
 
 month2str = {
     1: 'Jan', 2: 'Feb', 3: 'Mar', 4: 'Apr', 5: 'May', 6: 'Jun',
     7: 'Jul', 8: 'Aug', 9: 'Sept', 10: 'Oct', 11: 'Nov', 12: 'Dec'
 }
+
+def get_db_connection():
+    """Establish a connection to the PostgreSQL database."""
+    try:
+        conn = psycopg2.connect(
+            host=os.getenv('DB_HOST', 'localhost'),
+            database=os.getenv('DB_NAME', 'rossman_db'),
+            user=os.getenv('DB_USER', 'postgres'),
+            password=os.getenv('DB_PASS', 'password')
+        )
+        return conn
+    except Exception as e:
+        print(f"Error connecting to database: {e}")
+        return None
+
+def log_prediction(user_input, prediction, data_source='user'):
+    """Log the input features and the resulting prediction to PostgreSQL."""
+    conn = get_db_connection()
+    if conn is None:
+        return
+    
+    table_name = os.getenv('TABLE_NAME', 'rossman_deployed')
+
+    try:
+        with conn.cursor() as cur:
+            insert_query = f"""
+                INSERT INTO {table_name} (
+                    store_id, date, promo, state_holiday, school_holiday, prediction, data_source
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """
+            cur.execute(insert_query, (
+                int(user_input['Store']),
+                user_input['Date'],
+                int(user_input['Promo']),
+                user_input['StateHoliday'],
+                int(user_input['SchoolHoliday']),
+                float(prediction),
+                data_source
+            ))
+            conn.commit()
+    except Exception as e:
+        print(f"Error logging to database: {e}")
+    finally:
+        conn.close()
 
 def decode_input(user_input, store_static_dict):
     store_id = int(user_input['Store'])

@@ -1,6 +1,9 @@
 from flask import Flask, render_template, request, jsonify
 import joblib
-from utils import decode_input
+from utils import decode_input, log_prediction
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = Flask(__name__)
 
@@ -31,6 +34,9 @@ def index():
         decoded_df[encoded_cols] = encoder.transform(decoded_df[categorical_cols])
         x_decoded = decoded_df[numeric_cols + encoded_cols]
         prediction = model.predict(x_decoded)[0]
+        
+        # Log to PostgreSQL
+        log_prediction(user_input, prediction)
 
     return render_template('index.html', prediction=prediction)
 
@@ -44,6 +50,10 @@ def api_predictor():
         decoded_df[encoded_cols] = encoder.transform(decoded_df[categorical_cols])
         x_decoded = decoded_df[numeric_cols + encoded_cols]
         prediction = float(model.predict(x_decoded)[0])
+        
+        # Log to PostgreSQL
+        log_prediction(data, prediction)
+        
         return jsonify({'prediction': prediction})
     except Exception as e:
         return jsonify({'error': str(e)}), 400
