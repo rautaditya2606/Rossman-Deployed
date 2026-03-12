@@ -12,13 +12,46 @@ A machine learning web application that predicts daily sales for Rossmann stores
 - **Web Interface**: User-friendly interface for easy interaction
 - **REST API**: Programmatic access to the prediction model
 - **Store Metadata Integration**: Automatically incorporates store-specific features
-- **Temporal Features**: Handles date-based features like holidays, promotions, and seasonality
+-   **MLOps Pipeline**: Real-time logging of inputs and predictions to PostgreSQL
+-   **Automated Data Generation**: Background scheduler that logs synthetic traffic for monitoring
+-   **Cloud Native**: Deployed on Render with PostgreSQL integration
 
 ## Prerequisites
 
-- Python 3.7+
-- pip (Python package manager)
-- Git
+-   Python 3.9+
+-   PostgreSQL (Local or managed like Render)
+-   pip (Python package manager)
+
+## Database Configuration
+
+The application logs all predictions to a PostgreSQL database.
+
+### Table Schema: `rossman_deployed`
+| Column | Type | Description |
+| :--- | :--- | :--- |
+| `id` | SERIAL | Primary Key |
+| `timestamp` | TIMESTAMP | Time of prediction |
+| `store_id` | INTEGER | Rossmann Store ID |
+| `date` | DATE | Sale date for prediction |
+| `promo` | INTEGER | Promotion active (0/1) |
+| `state_holiday` | VARCHAR | Holiday type ('0', 'a', 'b', 'c') |
+| `school_holiday` | INTEGER | School holiday active (0/1) |
+| `prediction` | DOUBLE | Forecasted Sales value |
+| `data_source` | VARCHAR | 'user' (web/API) or 'synthetic' (auto-generated) |
+
+### Setup Instructions
+
+1.  **Environment Variables**: Create a `.env` file in the root directory:
+    ```env
+    DATABASE_URL=your_postgresql_url
+    TABLE_NAME=rossman_deployed
+    ```
+    *Note: For Render, use the **Internal URL** for the web service and the **External URL** for local testing.*
+
+2.  **Initialize Database**:
+    ```bash
+    python init_db.py
+    ```
 
 ## Installation
 
