@@ -11,13 +11,19 @@ month2str = {
 
 def get_db_connection():
     """Establish a connection to the PostgreSQL database."""
+    db_url = os.getenv('DATABASE_URL')
     try:
-        conn = psycopg2.connect(
-            host=os.getenv('DB_HOST', 'localhost'),
-            database=os.getenv('DB_NAME', 'rossman_db'),
-            user=os.getenv('DB_USER', 'postgres'),
-            password=os.getenv('DB_PASS', 'password')
-        )
+        if db_url:
+            # Use fixed URL if provided (standard for Render/Heroku)
+            conn = psycopg2.connect(db_url)
+        else:
+            # Fallback to individual parameters (local development)
+            conn = psycopg2.connect(
+                host=os.getenv('DB_HOST', 'localhost'),
+                database=os.getenv('DB_NAME', 'rossman_db'),
+                user=os.getenv('DB_USER', 'postgres'),
+                password=os.getenv('DB_PASS', 'password')
+            )
         return conn
     except Exception as e:
         print(f"Error connecting to database: {e}")
