@@ -11,6 +11,11 @@ load_dotenv()
 app = Flask(__name__)
 scheduler = APScheduler()
 
+# Initialize and start scheduler for Production (Gunicorn)
+if not app.debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
+    scheduler.init_app(app)
+    scheduler.start()
+
 model = joblib.load('model/xgb_pipeline.joblib')
 scaler = joblib.load('model/scaler.joblib')
 encoder = joblib.load('model/encoder.joblib')
