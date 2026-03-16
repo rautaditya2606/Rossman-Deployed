@@ -11,10 +11,12 @@ load_dotenv()
 app = Flask(__name__)
 scheduler = APScheduler()
 
-# Initialize and start scheduler for Production (Gunicorn)
-if not app.debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
-    scheduler.init_app(app)
-    scheduler.start()
+# Avoid running scheduler multiple times (once for gunicorn worker)
+if not scheduler.running:
+    # Initialize and start scheduler for Production (Gunicorn) or local direct script
+    if not app.debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
+        scheduler.init_app(app)
+        scheduler.start()
 
 model = joblib.load('model/xgb_pipeline.joblib')
 scaler = joblib.load('model/scaler.joblib')
@@ -93,9 +95,8 @@ def api_predictor():
 
 
 if __name__ == '__main__':
-    # Initialize and start scheduler
-    scheduler.init_app(app)
-    scheduler.start()
+    # Scheduler is already initialized and started in top-level app context
+    # for production/reloader scenarios above if needed.
     
     app.run(debug=True, port=8080, host='0.0.0.0', use_reloader=False)
     app.config['TEMPLATES_AUTO_RELOAD'] = True

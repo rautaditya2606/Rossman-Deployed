@@ -546,6 +546,46 @@
     </div>
 
     <script>
+      const HOLIDAY_DATES = {
+        '2024-12-25': 'c', '2024-12-26': 'c',
+        '2025-12-25': 'c', '2025-12-26': 'c',
+        '2026-12-25': 'c', '2026-12-26': 'c',
+      };
+
+      function updateDateFromHolidays() {
+        const stateHoliday = document.getElementById('stateHolidaySelect').value;
+        const schoolHoliday = document.querySelector('input[name="SchoolHoliday"][type="checkbox"]').checked;
+        const dateInput = document.getElementById('dateInput');
+        
+        if (stateHoliday === '0' && !schoolHoliday) return;
+
+        const currentDate = dateInput.value ? new Date(dateInput.value) : new Date();
+        const year = currentDate.getFullYear();
+        
+        let targetDate = null;
+
+        if (stateHoliday === 'c') {
+          targetDate = new Date(year, 11, 25); // Dec 25
+        } else if (stateHoliday === 'b') {
+          const easter = getEaster(year);
+          targetDate = new Date(year, easter.month - 1, easter.day);
+          targetDate.setDate(targetDate.getDate() - 2); // Good Friday
+        } else if (stateHoliday === 'a') {
+          // Find next Saturday or Sunday
+          targetDate = new Date(currentDate);
+          while (targetDate.getDay() !== 0 && targetDate.getDay() !== 6) {
+            targetDate.setDate(targetDate.getDate() + 1);
+          }
+        }
+
+        if (targetDate) {
+          dateInput.value = targetDate.toISOString().split('T')[0];
+        }
+      }
+
+      document.getElementById('stateHolidaySelect').addEventListener('change', updateDateFromHolidays);
+      document.querySelector('input[name="SchoolHoliday"][type="checkbox"]').addEventListener('change', updateDateFromHolidays);
+
       document.getElementById('dateInput').addEventListener('change', function () {
         const dateVal = this.value
         if (!dateVal) return
