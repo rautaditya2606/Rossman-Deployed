@@ -27,7 +27,7 @@ categorical_cols = ['DayOfWeek', 'StateHoliday', 'StoreType', 'Assortment']
 encoded_cols = encoder.get_feature_names_out().tolist()
 
 
-@scheduler.task('interval', id='do_job_1', seconds=1, max_instances=3)
+@scheduler.task('interval', id='do_job_1', seconds=10, max_instances=2)
 def scheduled_prediction_job():
     """Every second: generate a synthetic prediction and stream it to Kafka."""
     with app.app_context():
