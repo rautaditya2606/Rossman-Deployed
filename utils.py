@@ -2,12 +2,45 @@ import pandas as pd
 import numpy as np
 import psycopg2
 import os
+import json
+import ssl
 from datetime import datetime
+from kafka import KafkaProducer
 
 month2str = {
     1: 'Jan', 2: 'Feb', 3: 'Mar', 4: 'Apr', 5: 'May', 6: 'Jun',
     7: 'Jul', 8: 'Aug', 9: 'Sept', 10: 'Oct', 11: 'Nov', 12: 'Dec'
 }
+
+def get_kafka_producer():
+    """Initialize a Kafka producer with SASL_SSL authentication."""
+    try:
+        bootstrap_server = os.getenv('KAFKA_BOOTSTRAP_SERVER')
+        sasl_user = os.getenv('KAFKA_USER')
+        sasl_pass = os.getenv('KAFKA_PASS')
+        
+        if not all([bootstrap_server, sasl_user, sasl_pass]):
+            print("Kafka environment variables not fully set. Skipping Kafka logging.")
+            return None
+        
+        context = ssl.create_default_context()
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
+
+        producer = KafkaProducer(
+            bootstrap_servers=bootstrap_server,
+            security_protocol="SASL_SSL",
+            sasl_mechanism="PLAIN",
+            sasl_plain_username=sasl_user,
+            sasl_plain_password=sasl_pass,
+            ssl_context=context,
+            api_version=(0, 10, 2),
+            value_serializer=lambda v: json.dumps(v).encode('utf-8')
+        )
+        return producer
+    except Exception as e:
+        print(f"Error creating Kafka producer: {e}")
+        return None
 
 def get_db_connection():
     """Establish a connection to the PostgreSQL database."""
@@ -30,34 +63,54 @@ def get_db_connection():
         return None
 
 def log_prediction(user_input, prediction, data_source='user'):
-    """Log the input features and the resulting prediction to PostgreSQL."""
+    """Log the input features and the resulting prediction to PostgreSQL and Kafka."""
+    # 1. Log to PostgreSQL
     conn = get_db_connection()
-    if conn is None:
-        return
-    
-    table_name = os.getenv('TABLE_NAME', 'rossman_deployed')
+    if conn:
+        table_name = os.getenv('TABLE_NAME', 'rossman_deployed')
+        try:
+            with conn.cursor() as cur:
+                insert_query = f"""
+                    INSERT INTO {table_name} (
+                        store_id, date, promo, state_holiday, school_holiday, prediction, data_source
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """
+                cur.execute(insert_query, (
+                    int(user_input['Store']),
+                    user_input['Date'],
+                    int(user_input['Promo']),
+                    user_input['StateHoliday'],
+                    int(user_input['SchoolHoliday']),
+                    float(prediction),
+                    data_source
+                ))
+                conn.commit()
+        except Exception as e:
+            print(f"Error logging to PostgreSQL: {e}")
+        finally:
+            conn.close()
 
-    try:
-        with conn.cursor() as cur:
-            insert_query = f"""
-                INSERT INTO {table_name} (
-                    store_id, date, promo, state_holiday, school_holiday, prediction, data_source
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s)
-            """
-            cur.execute(insert_query, (
-                int(user_input['Store']),
-                user_input['Date'],
-                int(user_input['Promo']),
-                user_input['StateHoliday'],
-                int(user_input['SchoolHoliday']),
-                float(prediction),
-                data_source
-            ))
-            conn.commit()
-    except Exception as e:
-        print(f"Error logging to database: {e}")
-    finally:
-        conn.close()
+    # 2. Log to Kafka
+    producer = get_kafka_producer()
+    if producer:
+        try:
+            topic_name = os.getenv('KAFKA_TOPIC', 'rossman_logs')
+            log_data = {
+                "timestamp": datetime.now().isoformat(),
+                "store_id": int(user_input['Store']),
+                "date": user_input['Date'],
+                "promo": int(user_input['Promo']),
+                "state_holiday": user_input['StateHoliday'],
+                "school_holiday": int(user_input['SchoolHoliday']),
+                "prediction": float(prediction),
+                "data_source": data_source
+            }
+            producer.send(topic_name, value=log_data)
+            producer.flush()
+        except Exception as e:
+            print(f"Error logging to Kafka: {e}")
+        finally:
+            producer.close()
 
 def decode_input(user_input, store_static_dict):
     store_id = int(user_input['Store'])
