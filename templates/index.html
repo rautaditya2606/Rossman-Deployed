@@ -465,6 +465,84 @@
         }
       }
       
+      .kafka-toast {
+        position: fixed;
+        bottom: 2rem;
+        right: 2rem;
+        background: white;
+        border: 2px solid var(--ink);
+        box-shadow: 8px 8px 0 var(--ink);
+        padding: 1.25rem 1.75rem;
+        font-family: 'IBM Plex Mono', monospace;
+        font-size: 0.8rem;
+        z-index: 1000;
+        display: flex;
+        align-items: flex-start;
+        gap: 1rem;
+        max-width: 320px;
+        transform: translateY(120%);
+        opacity: 0;
+        transition: transform 0.3s ease, opacity 0.3s ease;
+      }
+
+      .kafka-toast.show {
+        transform: translateY(0);
+        opacity: 1;
+      }
+
+      .kafka-toast-icon {
+        font-size: 1.4rem;
+        line-height: 1;
+        flex-shrink: 0;
+      }
+
+      .kafka-toast-title {
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--success);
+        margin-bottom: 0.3rem;
+      }
+
+      .kafka-toast-body {
+        color: var(--muted);
+        font-size: 0.72rem;
+        line-height: 1.5;
+      }
+
+      .kafka-toast-close {
+        position: absolute;
+        top: 0.5rem;
+        right: 0.75rem;
+        background: none;
+        border: none;
+        font-size: 1rem;
+        cursor: pointer;
+        color: var(--muted);
+        font-family: 'IBM Plex Mono', monospace;
+        line-height: 1;
+      }
+
+      .kafka-toast-bar {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        height: 3px;
+        background: var(--success);
+        width: 100%;
+        transform-origin: left;
+        animation: none;
+      }
+
+      .kafka-toast.show .kafka-toast-bar {
+        animation: shrink 4s linear forwards;
+      }
+
+      @keyframes shrink {
+        from { transform: scaleX(1); }
+        to   { transform: scaleX(0); }
+      }
+
       @media (prefers-reduced-motion: reduce) {
         * {
           animation: none !important;
@@ -528,18 +606,8 @@
             {% endif %}
 
             {% if log_status %}
-              <div class="log-info" style="margin-top: 1rem; font-family: 'IBM Plex Mono', monospace; font-size: 0.8rem; text-align: center;">
-                {% if log_status.kafka %}
-                  <span style="color: var(--success); font-weight: 600;">✓ Data logged to Aiven Kafka</span>
-                {% else %}
-                  <span style="color: var(--accent); font-weight: 600;">✗ Kafka logging failed</span>
-                {% endif %}
-                <br>
-                {% if log_status.postgres %}
-                  <span style="color: var(--success); font-weight: 600;">✓ Data logged to PostgreSQL</span>
-                {% else %}
-                  <span style="color: var(--accent); font-weight: 600;">✗ PostgreSQL logging failed</span>
-                {% endif %}
+              <div id="kafkaStatus"
+                   data-kafka="{{ 'true' if log_status.kafka else 'false' }}">
               </div>
             {% endif %}
           </div>
@@ -559,6 +627,16 @@
           </div>
         </aside>
       </div>
+    </div>
+
+    <div class="kafka-toast" id="kafkaToast" role="alert" aria-live="polite">
+      <button class="kafka-toast-close" onclick="dismissToast()" aria-label="Close">&times;</button>
+      <div class="kafka-toast-icon">&#9889;</div>
+      <div>
+        <div class="kafka-toast-title" id="kafkaToastTitle">Logged to Kafka</div>
+        <div class="kafka-toast-body" id="kafkaToastBody">Your prediction was streamed to Aiven Kafka successfully.</div>
+      </div>
+      <div class="kafka-toast-bar"></div>
     </div>
 
     <script>
@@ -714,6 +792,47 @@
         document.body.removeChild(textArea)
       }
       
+      // Kafka toast
+      let toastTimer = null;
+
+      function showToast(title, body, isSuccess) {
+        const toast = document.getElementById('kafkaToast');
+        const titleEl = document.getElementById('kafkaToastTitle');
+        const bodyEl = document.getElementById('kafkaToastBody');
+        const bar = toast.querySelector('.kafka-toast-bar');
+
+        titleEl.textContent = title;
+        bodyEl.textContent = body;
+        titleEl.style.color = isSuccess ? 'var(--success)' : 'var(--accent)';
+        bar.style.background = isSuccess ? 'var(--success)' : 'var(--accent)';
+
+        // Reset animation
+        bar.style.animation = 'none';
+        bar.offsetHeight; // reflow
+        bar.style.animation = '';
+
+        toast.classList.add('show');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(dismissToast, 4000);
+      }
+
+      function dismissToast() {
+        document.getElementById('kafkaToast').classList.remove('show');
+        clearTimeout(toastTimer);
+      }
+
+      // Fire toast on page load if server returned log_status
+      (function () {
+        const el = document.getElementById('kafkaStatus');
+        if (!el) return;
+        const kafka = el.dataset.kafka === 'true';
+        if (kafka) {
+          showToast('⚡ Streamed to Kafka', 'Your prediction was successfully streamed to Aiven Kafka.', true);
+        } else {
+          showToast('Kafka logging failed', 'Could not stream data to Aiven Kafka.', false);
+        }
+      })();
+
       function showCopySuccess(button) {
         const originalText = button.textContent
         const originalBg = button.style.background

@@ -1,6 +1,5 @@
 import pandas as pd
 import numpy as np
-import psycopg2
 import os
 import json
 import ssl
@@ -12,114 +11,59 @@ month2str = {
     7: 'Jul', 8: 'Aug', 9: 'Sept', 10: 'Oct', 11: 'Nov', 12: 'Dec'
 }
 
+# Persistent Kafka producer — initialized once, reused for every log call.
+_kafka_producer = None
+
 def get_kafka_producer():
-    """Initialize a Kafka producer with either SASL_SSL or SSL (Client Cert) authentication."""
+    global _kafka_producer
+    if _kafka_producer is not None:
+        return _kafka_producer
     try:
-        # 1. Try SSL Client Certificate first if files exist
-        ca_file = "ca.pem"
-        cert_file = "service.cert"
-        key_file = "service.key"
-        
+        ca_file, cert_file, key_file = "ca.pem", "service.cert", "service.key"
         if os.path.exists(ca_file) and os.path.exists(cert_file) and os.path.exists(key_file):
-            print("Using Kafka SSL Client Certificate authentication...")
-            bootstrap_server = os.getenv('KAFKA_BOOTSTRAP_SERVER_SSL', 'kafka-23493bfd-aditya-fbdc.k.aivencloud.com:22766')
-            producer = KafkaProducer(
-                bootstrap_servers=bootstrap_server,
+            print("Kafka: using SSL Client Certificate auth.")
+            _kafka_producer = KafkaProducer(
+                bootstrap_servers=os.getenv('KAFKA_BOOTSTRAP_SERVER_SSL', 'kafka-23493bfd-aditya-fbdc.k.aivencloud.com:22766'),
                 security_protocol="SSL",
                 ssl_cafile=ca_file,
                 ssl_certfile=cert_file,
                 ssl_keyfile=key_file,
-                api_version=(0, 10, 2),
                 value_serializer=lambda v: json.dumps(v).encode('utf-8')
             )
-            return producer
+            return _kafka_producer
 
-        # 2. Fallback to SASL_SSL if environment variables are set
         bootstrap_server = os.getenv('KAFKA_BOOTSTRAP_SERVER')
         sasl_user = os.getenv('KAFKA_USER')
         sasl_pass = os.getenv('KAFKA_PASS')
-        
         if all([bootstrap_server, sasl_user, sasl_pass]):
-            print("Using Kafka SASL_SSL authentication...")
+            print("Kafka: using SASL_SSL auth.")
             context = ssl.create_default_context()
             context.check_hostname = False
             context.verify_mode = ssl.CERT_NONE
-
-            producer = KafkaProducer(
+            _kafka_producer = KafkaProducer(
                 bootstrap_servers=bootstrap_server,
                 security_protocol="SASL_SSL",
                 sasl_mechanism="PLAIN",
                 sasl_plain_username=sasl_user,
                 sasl_plain_password=sasl_pass,
                 ssl_context=context,
-                api_version=(0, 10, 2),
                 value_serializer=lambda v: json.dumps(v).encode('utf-8')
             )
-            return producer
-            
-        print("No Kafka authentication configuration found.")
+            return _kafka_producer
+
+        print("Kafka: no auth configuration found.")
         return None
     except Exception as e:
-        print(f"Error creating Kafka producer: {e}")
+        print(f"Kafka producer error: {e}")
         return None
 
-def get_db_connection():
-    """Establish a connection to the PostgreSQL database."""
-    db_url = os.getenv('DATABASE_URL')
-    try:
-        if db_url:
-            # Use fixed URL if provided (standard for Render/Heroku)
-            conn = psycopg2.connect(db_url)
-        else:
-            # Fallback to individual parameters (local development)
-            conn = psycopg2.connect(
-                host=os.getenv('DB_HOST', 'localhost'),
-                database=os.getenv('DB_NAME', 'rossman_db'),
-                user=os.getenv('DB_USER', 'postgres'),
-                password=os.getenv('DB_PASS', 'password')
-            )
-        return conn
-    except Exception as e:
-        print(f"Error connecting to database: {e}")
-        return None
 
 def log_prediction(user_input, prediction, data_source='user'):
-    """Log the input features and the resulting prediction to PostgreSQL and Kafka."""
-    postgres_success = False
+    """Stream the input features and prediction to Kafka."""
     kafka_success = False
-
-    # 1. Log to PostgreSQL
-    conn = get_db_connection()
-    if conn:
-        table_name = os.getenv('TABLE_NAME', 'rossman_deployed')
-        try:
-            with conn.cursor() as cur:
-                insert_query = f"""
-                    INSERT INTO {table_name} (
-                        store_id, date, promo, state_holiday, school_holiday, prediction, data_source
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s)
-                """
-                cur.execute(insert_query, (
-                    int(user_input['Store']),
-                    user_input['Date'],
-                    int(user_input['Promo']),
-                    user_input['StateHoliday'],
-                    int(user_input['SchoolHoliday']),
-                    float(prediction),
-                    data_source
-                ))
-                conn.commit()
-                postgres_success = True
-        except Exception as e:
-            print(f"Error logging to PostgreSQL: {e}")
-        finally:
-            conn.close()
-
-    # 2. Log to Kafka
     producer = get_kafka_producer()
     if producer:
         try:
-            topic_name = os.getenv('KAFKA_TOPIC', 'rossman_logs')
             log_data = {
                 "timestamp": datetime.now().isoformat(),
                 "store_id": int(user_input['Store']),
@@ -130,16 +74,12 @@ def log_prediction(user_input, prediction, data_source='user'):
                 "prediction": float(prediction),
                 "data_source": data_source
             }
-            future = producer.send(topic_name, value=log_data)
-            future.get(timeout=10) # Block to ensure it's sent
-            producer.flush()
+            producer.send(os.getenv('KAFKA_TOPIC', 'rossman'), value=log_data).get(timeout=10)
             kafka_success = True
         except Exception as e:
-            print(f"Error logging to Kafka: {e}")
-        finally:
-            producer.close()
-    
-    return {"postgres": postgres_success, "kafka": kafka_success}
+            print(f"Kafka send error: {e}")
+    return {"kafka": kafka_success}
+
 
 def decode_input(user_input, store_static_dict):
     store_id = int(user_input['Store'])

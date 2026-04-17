@@ -24,3 +24,8 @@ cleanenv/
 # Local development
 .DS_Store
 Thumbs.db
+
+service.key
+service.cert
+service.ca
+ca.pem

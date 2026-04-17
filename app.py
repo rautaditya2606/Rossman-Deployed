@@ -11,9 +11,7 @@ load_dotenv()
 app = Flask(__name__)
 scheduler = APScheduler()
 
-# Avoid running scheduler multiple times (once for gunicorn worker)
 if not scheduler.running:
-    # Initialize and start scheduler for Production (Gunicorn) or local direct script
     if not app.debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
         scheduler.init_app(app)
         scheduler.start()
@@ -23,32 +21,28 @@ scaler = joblib.load('model/scaler.joblib')
 encoder = joblib.load('model/encoder.joblib')
 store_static_dict = joblib.load('model/store_static_dict.joblib')
 
-@scheduler.task('interval', id='do_job_1', minutes=1)
+# Must match the order during training
+numeric_cols = ['Store', 'Promo', 'SchoolHoliday', 'CompetitionDistance', 'CompetitionOpen', 'Promo2', 'Promo2Open', 'IsPromo2Month', 'Day', 'Month', 'Year', 'WeekOfYear']
+categorical_cols = ['DayOfWeek', 'StateHoliday', 'StoreType', 'Assortment']
+encoded_cols = encoder.get_feature_names_out().tolist()
+
+
+@scheduler.task('interval', id='do_job_1', seconds=1, max_instances=3)
 def scheduled_prediction_job():
-    """Background task to generate synthetic data and log it."""
+    """Every second: generate a synthetic prediction and stream it to Kafka."""
     with app.app_context():
         try:
-            # 1. Generate random input
             data = generate_random_input()
-            
-            # 2. Process data exactly like real requests
             decoded_df = decode_input(data, store_static_dict)
             decoded_df[numeric_cols] = scaler.transform(decoded_df[numeric_cols])
             decoded_df[encoded_cols] = encoder.transform(decoded_df[categorical_cols])
             x_decoded = decoded_df[numeric_cols + encoded_cols]
-            
-            # 3. Predict & Log
             prediction = float(model.predict(x_decoded)[0])
             log_prediction(data, prediction, data_source='synthetic')
-            
-            print(f"DEBUG: Auto-logged synthetic prediction for Store {data['Store']}")
+            print(f"Streamed synthetic prediction → Store {data['Store']} | pred={prediction:.2f}")
         except Exception as e:
-            print(f"DEBUG: Failed to run background job: {e}")
+            print(f"Scheduler error: {e}")
 
-# These must match the order during training
-numeric_cols = ['Store','Promo', 'SchoolHoliday', 'CompetitionDistance', 'CompetitionOpen', 'Promo2', 'Promo2Open', 'IsPromo2Month', 'Day','Month', 'Year', 'WeekOfYear']
-categorical_cols = ['DayOfWeek', 'StateHoliday', 'StoreType', 'Assortment']
-encoded_cols = encoder.get_feature_names_out().tolist()
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
@@ -62,14 +56,11 @@ def index():
             'StateHoliday': request.form['StateHoliday'],
             'SchoolHoliday': request.form['SchoolHoliday']
         }
-
         decoded_df = decode_input(user_input, store_static_dict)
         decoded_df[numeric_cols] = scaler.transform(decoded_df[numeric_cols])
         decoded_df[encoded_cols] = encoder.transform(decoded_df[categorical_cols])
         x_decoded = decoded_df[numeric_cols + encoded_cols]
         prediction = model.predict(x_decoded)[0]
-        
-        # Log to PostgreSQL and Kafka
         log_status = log_prediction(user_input, prediction)
 
     return render_template('index.html', prediction=prediction, log_status=log_status)
@@ -84,20 +75,12 @@ def api_predictor():
         decoded_df[encoded_cols] = encoder.transform(decoded_df[categorical_cols])
         x_decoded = decoded_df[numeric_cols + encoded_cols]
         prediction = float(model.predict(x_decoded)[0])
-        
-        # Log to PostgreSQL
         log_prediction(data, prediction)
-        
         return jsonify({'prediction': prediction})
     except Exception as e:
         return jsonify({'error': str(e)}), 400
 
-    
-
 
 if __name__ == '__main__':
-    # Scheduler is already initialized and started in top-level app context
-    # for production/reloader scenarios above if needed.
-    
     app.run(debug=True, port=8080, host='0.0.0.0', use_reloader=False)
     app.config['TEMPLATES_AUTO_RELOAD'] = True
