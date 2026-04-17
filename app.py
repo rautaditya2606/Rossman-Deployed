@@ -53,6 +53,7 @@ encoded_cols = encoder.get_feature_names_out().tolist()
 @app.route('/', methods=['GET', 'POST'])
 def index():
     prediction = None
+    log_status = None
     if request.method == 'POST':
         user_input = {
             'Store': request.form['Store'],
@@ -68,10 +69,10 @@ def index():
         x_decoded = decoded_df[numeric_cols + encoded_cols]
         prediction = model.predict(x_decoded)[0]
         
-        # Log to PostgreSQL
-        log_prediction(user_input, prediction)
+        # Log to PostgreSQL and Kafka
+        log_status = log_prediction(user_input, prediction)
 
-    return render_template('index.html', prediction=prediction)
+    return render_template('index.html', prediction=prediction, log_status=log_status)
 
 
 @app.route('/api/predictor', methods=['POST'])

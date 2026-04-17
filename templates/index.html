@@ -526,6 +526,22 @@
                 <h3>Predicted Sales: {{ prediction }}</h3>
               </div>
             {% endif %}
+
+            {% if log_status %}
+              <div class="log-info" style="margin-top: 1rem; font-family: 'IBM Plex Mono', monospace; font-size: 0.8rem; text-align: center;">
+                {% if log_status.kafka %}
+                  <span style="color: var(--success); font-weight: 600;">✓ Data logged to Aiven Kafka</span>
+                {% else %}
+                  <span style="color: var(--accent); font-weight: 600;">✗ Kafka logging failed</span>
+                {% endif %}
+                <br>
+                {% if log_status.postgres %}
+                  <span style="color: var(--success); font-weight: 600;">✓ Data logged to PostgreSQL</span>
+                {% else %}
+                  <span style="color: var(--accent); font-weight: 600;">✗ PostgreSQL logging failed</span>
+                {% endif %}
+              </div>
+            {% endif %}
           </div>
         </section>
 

@@ -64,6 +64,9 @@ def get_db_connection():
 
 def log_prediction(user_input, prediction, data_source='user'):
     """Log the input features and the resulting prediction to PostgreSQL and Kafka."""
+    postgres_success = False
+    kafka_success = False
+
     # 1. Log to PostgreSQL
     conn = get_db_connection()
     if conn:
@@ -85,6 +88,7 @@ def log_prediction(user_input, prediction, data_source='user'):
                     data_source
                 ))
                 conn.commit()
+                postgres_success = True
         except Exception as e:
             print(f"Error logging to PostgreSQL: {e}")
         finally:
@@ -105,12 +109,16 @@ def log_prediction(user_input, prediction, data_source='user'):
                 "prediction": float(prediction),
                 "data_source": data_source
             }
-            producer.send(topic_name, value=log_data)
+            future = producer.send(topic_name, value=log_data)
+            future.get(timeout=10) # Block to ensure it's sent
             producer.flush()
+            kafka_success = True
         except Exception as e:
             print(f"Error logging to Kafka: {e}")
         finally:
             producer.close()
+    
+    return {"postgres": postgres_success, "kafka": kafka_success}
 
 def decode_input(user_input, store_static_dict):
     store_id = int(user_input['Store'])
