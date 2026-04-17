@@ -13,31 +13,52 @@ month2str = {
 }
 
 def get_kafka_producer():
-    """Initialize a Kafka producer with SASL_SSL authentication."""
+    """Initialize a Kafka producer with either SASL_SSL or SSL (Client Cert) authentication."""
     try:
+        # 1. Try SSL Client Certificate first if files exist
+        ca_file = "ca.pem"
+        cert_file = "service.cert"
+        key_file = "service.key"
+        
+        if os.path.exists(ca_file) and os.path.exists(cert_file) and os.path.exists(key_file):
+            print("Using Kafka SSL Client Certificate authentication...")
+            bootstrap_server = os.getenv('KAFKA_BOOTSTRAP_SERVER_SSL', 'kafka-23493bfd-aditya-fbdc.k.aivencloud.com:22766')
+            producer = KafkaProducer(
+                bootstrap_servers=bootstrap_server,
+                security_protocol="SSL",
+                ssl_cafile=ca_file,
+                ssl_certfile=cert_file,
+                ssl_keyfile=key_file,
+                api_version=(0, 10, 2),
+                value_serializer=lambda v: json.dumps(v).encode('utf-8')
+            )
+            return producer
+
+        # 2. Fallback to SASL_SSL if environment variables are set
         bootstrap_server = os.getenv('KAFKA_BOOTSTRAP_SERVER')
         sasl_user = os.getenv('KAFKA_USER')
         sasl_pass = os.getenv('KAFKA_PASS')
         
-        if not all([bootstrap_server, sasl_user, sasl_pass]):
-            print("Kafka environment variables not fully set. Skipping Kafka logging.")
-            return None
-        
-        context = ssl.create_default_context()
-        context.check_hostname = False
-        context.verify_mode = ssl.CERT_NONE
+        if all([bootstrap_server, sasl_user, sasl_pass]):
+            print("Using Kafka SASL_SSL authentication...")
+            context = ssl.create_default_context()
+            context.check_hostname = False
+            context.verify_mode = ssl.CERT_NONE
 
-        producer = KafkaProducer(
-            bootstrap_servers=bootstrap_server,
-            security_protocol="SASL_SSL",
-            sasl_mechanism="PLAIN",
-            sasl_plain_username=sasl_user,
-            sasl_plain_password=sasl_pass,
-            ssl_context=context,
-            api_version=(0, 10, 2),
-            value_serializer=lambda v: json.dumps(v).encode('utf-8')
-        )
-        return producer
+            producer = KafkaProducer(
+                bootstrap_servers=bootstrap_server,
+                security_protocol="SASL_SSL",
+                sasl_mechanism="PLAIN",
+                sasl_plain_username=sasl_user,
+                sasl_plain_password=sasl_pass,
+                ssl_context=context,
+                api_version=(0, 10, 2),
+                value_serializer=lambda v: json.dumps(v).encode('utf-8')
+            )
+            return producer
+            
+        print("No Kafka authentication configuration found.")
+        return None
     except Exception as e:
         print(f"Error creating Kafka producer: {e}")
         return None
