@@ -15,7 +15,7 @@ def get_db_connection():
     try:
         if db_url:
             # Use fixed URL if provided (standard for Render/Heroku)
-            conn = psycopg2.connect(db_url)
+            conn = psycopg2.connect(db_url, sslmode='require')
         else:
             # Fallback to individual parameters (local development)
             conn = psycopg2.connect(

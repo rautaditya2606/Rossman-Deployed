@@ -94,6 +94,35 @@ def api_predictor():
     
 
 
+@app.route('/api/stats', methods=['GET'])
+def get_stats():
+    """Retrieve data logging counts directly from the application's DB connection."""
+    from utils import get_db_connection
+    conn = get_db_connection()
+    if conn is None:
+        return jsonify({'error': 'Could not connect to database'}), 500
+    
+    table_name = os.getenv('TABLE_NAME', 'rossman_deployed')
+    try:
+        with conn.cursor() as cur:
+            # Total count
+            cur.execute(f"SELECT COUNT(*) FROM {table_name};")
+            total_count = cur.fetchone()[0]
+            
+            # Breakdown
+            cur.execute(f"SELECT data_source, COUNT(*) FROM {table_name} GROUP BY data_source;")
+            breakdown = {row[0]: row[1] for row in cur.fetchall()}
+            
+            return jsonify({
+                'table': table_name,
+                'total_count': total_count,
+                'breakdown': breakdown
+            })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+
 if __name__ == '__main__':
     # Scheduler is already initialized and started in top-level app context
     # for production/reloader scenarios above if needed.
