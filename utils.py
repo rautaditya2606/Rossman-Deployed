@@ -3,6 +3,8 @@ import numpy as np
 import os
 import json
 import ssl
+import base64
+import requests
 from datetime import datetime
 from kafka import KafkaProducer
 
@@ -11,13 +13,18 @@ month2str = {
     7: 'Jul', 8: 'Aug', 9: 'Sept', 10: 'Oct', 11: 'Nov', 12: 'Dec'
 }
 
-# Persistent Kafka producer — initialized once, reused for every log call.
+# ---------------------------------------------------------------------------
+# Kafka producer — initialized once, reused every call.
+# _kafka_producer = None  → not yet attempted
+# _kafka_producer = False → failed, don't retry (use REST proxy instead)
+# ---------------------------------------------------------------------------
 _kafka_producer = None
 
 def get_kafka_producer():
     global _kafka_producer
     if _kafka_producer is not None:
-        return _kafka_producer
+        return _kafka_producer or None   # False → None
+
     try:
         ca_file, cert_file, key_file = "ca.pem", "service.cert", "service.key"
         if os.path.exists(ca_file) and os.path.exists(cert_file) and os.path.exists(key_file):
@@ -36,7 +43,7 @@ def get_kafka_producer():
         sasl_user = os.getenv('KAFKA_USER')
         sasl_pass = os.getenv('KAFKA_PASS')
         if all([bootstrap_server, sasl_user, sasl_pass]):
-            print("Kafka: using SASL_SSL auth.")
+            print("Kafka: trying SASL_SSL auth...")
             context = ssl.create_default_context()
             context.check_hostname = False
             context.verify_mode = ssl.CERT_NONE
@@ -49,36 +56,67 @@ def get_kafka_producer():
                 ssl_context=context,
                 value_serializer=lambda v: json.dumps(v).encode('utf-8')
             )
+            print("Kafka: SASL_SSL connected.")
             return _kafka_producer
 
-        print("Kafka: no auth configuration found.")
         return None
     except Exception as e:
-        print(f"Kafka producer error: {e}")
+        print(f"Kafka direct connection failed ({e}), will use REST proxy.")
+        _kafka_producer = False   # sentinel — skip retries, fall back to REST
         return None
+
+
+def _send_via_rest_proxy(topic: str, data: dict) -> bool:
+    """Send a message via Aiven Kafka REST Proxy (HTTPS — works from any cloud)."""
+    rest_url = os.getenv('KAFKA_REST_PROXY_URL', 'https://kafka-23493bfd-aditya-fbdc.k.aivencloud.com:22768')
+    user = os.getenv('KAFKA_USER')
+    password = os.getenv('KAFKA_PASS')
+    if not user or not password:
+        return False
+    try:
+        encoded = base64.b64encode(json.dumps(data).encode()).decode()
+        resp = requests.post(
+            f"{rest_url}/topics/{topic}",
+            headers={
+                "Content-Type": "application/vnd.kafka.binary.v2+json",
+                "Accept": "application/vnd.kafka.v2+json",
+            },
+            json={"records": [{"value": encoded}]},
+            auth=(user, password),
+            timeout=10,
+        )
+        resp.raise_for_status()
+        return True
+    except Exception as e:
+        print(f"Kafka REST proxy error: {e}")
+        return False
 
 
 def log_prediction(user_input, prediction, data_source='user'):
-    """Stream the input features and prediction to Kafka."""
-    kafka_success = False
+    """Stream input features and prediction to Kafka (direct or REST proxy)."""
+    log_data = {
+        "timestamp": datetime.now().isoformat(),
+        "store_id": int(user_input['Store']),
+        "date": user_input['Date'],
+        "promo": int(user_input['Promo']),
+        "state_holiday": user_input['StateHoliday'],
+        "school_holiday": int(user_input['SchoolHoliday']),
+        "prediction": float(prediction),
+        "data_source": data_source,
+    }
+    topic = os.getenv('KAFKA_TOPIC', 'rossman')
+
     producer = get_kafka_producer()
     if producer:
         try:
-            log_data = {
-                "timestamp": datetime.now().isoformat(),
-                "store_id": int(user_input['Store']),
-                "date": user_input['Date'],
-                "promo": int(user_input['Promo']),
-                "state_holiday": user_input['StateHoliday'],
-                "school_holiday": int(user_input['SchoolHoliday']),
-                "prediction": float(prediction),
-                "data_source": data_source
-            }
-            producer.send(os.getenv('KAFKA_TOPIC', 'rossman'), value=log_data).get(timeout=10)
-            kafka_success = True
+            producer.send(topic, value=log_data).get(timeout=10)
+            return {"kafka": True}
         except Exception as e:
             print(f"Kafka send error: {e}")
-    return {"kafka": kafka_success}
+
+    # Fallback: REST proxy
+    success = _send_via_rest_proxy(topic, log_data)
+    return {"kafka": success}
 
 
 def decode_input(user_input, store_static_dict):

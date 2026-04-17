@@ -6,7 +6,7 @@
 
 ---
 
-A machine learning web application that predicts daily sales for Rossmann stores using XGBoost. Every prediction — whether from a human or auto-generated — is logged in real time to both PostgreSQL and Aiven Kafka, enabling a full MLOps observability pipeline.
+A machine learning web application that predicts daily sales for Rossmann stores using XGBoost. Every prediction — whether from a human or auto-generated — is streamed in real time to Aiven Kafka, enabling a full MLOps observability pipeline.
 
 ## Features
 
@@ -14,11 +14,10 @@ A machine learning web application that predicts daily sales for Rossmann stores
 - **Web Interface**: Brutalist-styled UI with toggle switches for promo/holiday inputs
 - **REST API**: Programmatic access to the prediction model
 - **Store Metadata Integration**: Automatically incorporates store-specific features (StoreType, Assortment, CompetitionDistance, Promo2 intervals)
-- **Real-time Kafka Streaming**: Every prediction is streamed to Aiven Kafka (`rossman` topic) via SSL client certificate auth
-- **PostgreSQL Logging**: All predictions persisted to a managed PostgreSQL database on Render
-- **Synthetic Data Logger**: Background scheduler fires every second — 60 synthetic predictions logged per minute — for continuous monitoring traffic
+- **Real-time Kafka Streaming**: Every prediction is streamed to Aiven Kafka (`rossman` topic) via SSL client certificate auth, with SASL_SSL fallback
+- **Synthetic Data Logger**: Background scheduler fires every 10 seconds — 6 synthetic predictions logged per minute — for continuous monitoring traffic
 - **UI Kafka Alert**: Toast notification appears in the browser after each successful human prediction confirming the data was streamed to Kafka
-- **Cloud Native**: Deployed on Render with managed PostgreSQL and Aiven Kafka
+- **Cloud Native**: Deployed on Render with Aiven Kafka
 
 ## Architecture
 
@@ -32,12 +31,10 @@ User / Scheduler
       │
       └──► log_prediction()
                 │
-                ├──► PostgreSQL (Render)
-                │
                 └──► Aiven Kafka
                          topic: rossman
-                         auth: SSL Client Certificate (port 22766)
-                         fallback: SASL_SSL (port 22769)
+                         auth: SSL Client Cert (port 22766)  ← local
+                         fallback: SASL_SSL (port 22769)     ← Render
 ```
 
 ## Kafka Setup
@@ -74,9 +71,9 @@ Every prediction produces a Kafka message with this structure:
 
 ### Authentication
 
-The app tries SSL client certificate auth first. If cert files are absent, it falls back to SASL_SSL using environment variables.
+The app tries SSL client certificate auth first. If cert files are absent (e.g. on Render), it falls back to SASL_SSL using environment variables.
 
-Required files for SSL cert auth (place in project root):
+Required files for SSL cert auth (place in project root, never commit):
 
 - `ca.pem` — CA certificate
 - `service.cert` — Access certificate
@@ -93,55 +90,29 @@ curl -u avnadmin:YOUR_PASSWORD \
 
 ## Synthetic Data Logger
 
-A background APScheduler task runs every second inside the Flask process:
+A background APScheduler task runs every 10 seconds inside the Flask process:
 
 ```text
-Every 1 second:
+Every 10 seconds:
   1. generate_random_input()  — random store, date, promo flags
   2. decode_input()           — enrich with store metadata
   3. model.predict()          — run XGBoost inference
   4. log_prediction(..., data_source='synthetic')
-       ├── PostgreSQL INSERT
        └── Kafka produce → topic: rossman
 ```
 
-This produces ~60 logged records per minute for continuous pipeline monitoring without requiring any human traffic.
-
-## Database Configuration
-
-### Table Schema: `rossman_deployed`
-
-| Column | Type | Description |
-| :--- | :--- | :--- |
-| `id` | SERIAL | Primary Key |
-| `timestamp` | TIMESTAMP | Time of prediction |
-| `store_id` | INTEGER | Rossmann Store ID |
-| `date` | DATE | Sale date for prediction |
-| `promo` | INTEGER | Promotion active (0/1) |
-| `state_holiday` | VARCHAR | Holiday type ('0', 'a', 'b', 'c') |
-| `school_holiday` | INTEGER | School holiday active (0/1) |
-| `prediction` | DOUBLE | Forecasted sales value |
-| `data_source` | VARCHAR | `'user'` or `'synthetic'` |
-
-### Initialize Database
-
-```bash
-python init_db.py
-```
+This produces ~6 logged records per minute for continuous pipeline monitoring without requiring any human traffic.
 
 ## Environment Variables
 
-Create a `.env` file in the project root:
+### Local (`.env` file)
 
 ```env
-# PostgreSQL
-DATABASE_URL=postgresql://user:pass@host/dbname
-TABLE_NAME=rossman_deployed
-
-# Kafka — SSL Client Cert (primary)
+# Kafka — SSL Client Cert (primary, local only)
 KAFKA_BOOTSTRAP_SERVER_SSL=kafka-23493bfd-aditya-fbdc.k.aivencloud.com:22766
+KAFKA_REST_PROXY_URL=https://kafka-23493bfd-aditya-fbdc.k.aivencloud.com:22768
 
-# Kafka — SASL_SSL (fallback)
+# Kafka — SASL_SSL (fallback, used on Render)
 KAFKA_BOOTSTRAP_SERVER=kafka-23493bfd-aditya-fbdc.k.aivencloud.com:22769
 KAFKA_USER=avnadmin
 KAFKA_PASS=your_kafka_password
@@ -150,7 +121,16 @@ KAFKA_PASS=your_kafka_password
 KAFKA_TOPIC=rossman
 ```
 
-> For Render deployment, set these as environment variables in the Render dashboard. Use the Internal Database URL for `DATABASE_URL`.
+### Render Dashboard
+
+Set these in Render → Web Service → **Environment**:
+
+| Key | Value |
+| :--- | :--- |
+| `KAFKA_BOOTSTRAP_SERVER` | `kafka-23493bfd-aditya-fbdc.k.aivencloud.com:22769` |
+| `KAFKA_USER` | `avnadmin` |
+| `KAFKA_PASS` | your Kafka password |
+| `KAFKA_TOPIC` | `rossman` |
 
 ## Installation
 
@@ -176,11 +156,7 @@ KAFKA_TOPIC=rossman
 
 4. Add Kafka cert files (`ca.pem`, `service.cert`, `service.key`) to the project root.
 
-5. Initialize the database:
-
-   ```bash
-   python init_db.py
-   ```
+5. Create `.env` with your Kafka credentials (see above).
 
 ## Usage
 
@@ -224,19 +200,19 @@ Built with XGBoost. Features used:
 
 ```text
 deploy_rossman/
-├── app.py                     # Flask app + APScheduler (1s synthetic logger)
-├── utils.py                   # log_prediction(), Kafka producer, DB connection
+├── app.py                     # Flask app + APScheduler (10s synthetic logger)
+├── utils.py                   # log_prediction(), Kafka producer
 ├── generate_synthetic_data.py # Random store input generator
-├── init_db.py                 # DB schema initializer
 ├── requirements.txt
 ├── Dockerfile
-├── ca.pem                     # Aiven Kafka CA certificate
-├── service.cert               # Aiven Kafka access certificate
-├── service.key                # Aiven Kafka access key
+├── ca.pem                     # Aiven Kafka CA certificate (gitignored)
+├── service.cert               # Aiven Kafka access certificate (gitignored)
+├── service.key                # Aiven Kafka access key (gitignored)
 ├── kafka_cert_producer.py     # Standalone SSL cert producer test
 ├── kafka_sasl_producer.py     # Standalone SASL_SSL producer test
 ├── kafka_rest_producer.py     # REST proxy producer test
 ├── kafka_rest_consumer.py     # REST proxy consumer test
+├── kafka_test_consumer.py     # SASL_SSL consumer test
 ├── model/
 │   ├── xgb_pipeline.joblib
 │   ├── scaler.joblib
