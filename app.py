@@ -2,7 +2,7 @@ from flask import Flask, render_template, request, jsonify
 from flask_apscheduler import APScheduler
 import joblib
 from utils import decode_input, log_prediction
-from generate_synthetic_data import generate_random_input
+from generate_synthetic_data import generate_random_input, set_valid_stores
 from dotenv import load_dotenv
 import os
 
@@ -20,6 +20,7 @@ model = joblib.load('model/xgb_pipeline.joblib')
 scaler = joblib.load('model/scaler.joblib')
 encoder = joblib.load('model/encoder.joblib')
 store_static_dict = joblib.load('model/store_static_dict.joblib')
+set_valid_stores(list(store_static_dict.keys()))
 
 # Must match the order during training
 numeric_cols = ['Store', 'Promo', 'SchoolHoliday', 'CompetitionDistance', 'CompetitionOpen', 'Promo2', 'Promo2Open', 'IsPromo2Month', 'Day', 'Month', 'Year', 'WeekOfYear']

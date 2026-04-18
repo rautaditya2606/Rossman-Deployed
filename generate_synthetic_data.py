@@ -1,16 +1,14 @@
 import random
 import time
 import requests
-import joblib
 import pandas as pd
 from datetime import datetime, timedelta
 
-# Load static data to get valid store IDs
-try:
-    store_static_dict = joblib.load('model/store_static_dict.joblib')
-    valid_stores = list(store_static_dict.keys())
-except:
-    valid_stores = list(range(1, 1116))  # Fallback range
+valid_stores = list(range(1, 1116))  # overridden by app.py via set_valid_stores()
+
+def set_valid_stores(stores):
+    global valid_stores
+    valid_stores = stores
 
 def generate_random_input():
     """Generates a random input following Rossmann data constraints."""
