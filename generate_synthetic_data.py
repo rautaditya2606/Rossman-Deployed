@@ -1,7 +1,6 @@
 import random
 import time
 import requests
-import pandas as pd
 from datetime import datetime, timedelta
 
 valid_stores = list(range(1, 1116))  # overridden by app.py via set_valid_stores()
