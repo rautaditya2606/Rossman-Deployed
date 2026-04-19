@@ -601,7 +601,7 @@
 
             {% if prediction %}
               <div class="result">
-                <h3>Predicted Sales: {{ prediction }}</h3>
+                <h3>Predicted Sales: {{ "%.2f"|format(prediction) }}</h3>
               </div>
             {% endif %}
 

@@ -2,57 +2,99 @@
 
 ---
 
-## 🔗 **[Live Demo](https://rossman-deployed-xxk0.onrender.com/)**
+## [Live Demo](https://rossman-deployed-xxk0.onrender.com/)
 
 ---
 
-A machine learning web application that predicts daily sales for Rossmann stores using XGBoost. Every prediction — whether from a human or auto-generated — is streamed in real time to Aiven Kafka, enabling a full MLOps observability pipeline.
+An end-to-end MLOps project — a production-deployed XGBoost model served via Flask, with every prediction (user or synthetic) streamed in real time to a managed Kafka cluster for continuous pipeline observability.
 
-## Features
+Built to mirror how ML systems work in industry: not just a model, but a live inference service with a streaming data layer.
 
-- **Sales Prediction**: Predict daily sales for any Rossmann store (ID 1–1115)
-- **Web Interface**: Brutalist-styled UI with toggle switches for promo/holiday inputs
-- **REST API**: Programmatic access to the prediction model
-- **Store Metadata Integration**: Automatically incorporates store-specific features (StoreType, Assortment, CompetitionDistance, Promo2 intervals)
-- **Real-time Kafka Streaming**: Every prediction is streamed to Aiven Kafka (`rossman` topic) via SSL client certificate auth, with SASL_SSL fallback
-- **Synthetic Data Logger**: Background scheduler fires every 10 seconds — 6 synthetic predictions logged per minute — for continuous monitoring traffic
-- **UI Kafka Alert**: Toast notification appears in the browser after each successful human prediction confirming the data was streamed to Kafka
-- **Cloud Native**: Deployed on Render with Aiven Kafka
+---
+
+## Tech Stack
+
+| Layer | Technology |
+| :--- | :--- |
+| Model | XGBoost (gradient boosting, sklearn pipeline) |
+| Backend | Python · Flask · Gunicorn |
+| Real-time Streaming | Apache Kafka (Aiven managed) · SSL + SASL_SSL auth |
+| Scheduler | Flask-APScheduler (1 Hz synthetic inference loop) |
+| Deployment | Render (memory-optimized: single worker + preload) |
+| Feature Engineering | pandas · numpy · scikit-learn (OHE + StandardScaler) |
+
+---
+
+## What Makes This Different
+
+Most ML demos stop at a Jupyter notebook or a basic Streamlit app. This project goes further:
+
+- **Real-time Kafka streaming** — every prediction is published to an Aiven Kafka topic with a full feature payload and timestamp, exactly as you would in a production ML monitoring system
+- **Dual auth strategy** — SSL client certificate auth locally, automatic SASL_SSL fallback on cloud (no code changes needed between environments)
+- **Continuous synthetic inference** — a background scheduler fires 1 prediction per second 24/7, producing ~3,600 logged records per hour for pipeline health monitoring without requiring any human traffic
+- **Memory-optimized deployment** — runs within a 512 MB cloud instance via single Gunicorn worker + `--preload` (OS-level copy-on-write sharing of the model across the process tree)
+
+---
 
 ## Architecture
 
 ```text
-User / Scheduler
-      │
-      ▼
-  Flask App (app.py)
-      │
-      ├──► XGBoost Model ──► Prediction
-      │
-      └──► log_prediction()
-                │
-                └──► Aiven Kafka
-                         topic: rossman
-                         auth: SSL Client Cert (port 22766)  ← local
-                         fallback: SASL_SSL (port 22769)     ← Render
+                    ┌─────────────────────────────────┐
+                    │           Flask App              │
+                    │                                  │
+  HTTP Request ────►│  /         (Web UI)              │
+  REST API     ────►│  /api/predictor                  │
+  Scheduler ───────►│  APScheduler (1 req/sec)         │
+                    │                                  │
+                    │  decode_input()                  │
+                    │    └─ store metadata lookup      │
+                    │    └─ date feature engineering   │
+                    │    └─ scaler + OHE transform     │
+                    │                                  │
+                    │  XGBoost model.predict()         │
+                    │                                  │
+                    │  log_prediction()                │
+                    │    ├─ SSL Client Cert  (local)   │
+                    │    └─ SASL_SSL fallback (cloud)  │
+                    └──────────────┬──────────────────┘
+                                   │
+                                   ▼
+                    ┌──────────────────────────────────┐
+                    │       Aiven Kafka Cluster        │
+                    │       topic: rossman             │
+                    │       ~3,600 msgs/hour           │
+                    └──────────────────────────────────┘
 ```
 
-## Kafka Setup
+---
 
-### Topic
+## Features
 
-| Field | Value |
-| :--- | :--- |
-| Topic | `rossman` |
-| Partitions | 1 |
-| Broker | `kafka-23493bfd-aditya-fbdc.k.aivencloud.com` |
-| SSL Port | `22766` |
-| SASL Port | `22769` |
-| REST Proxy | `https://...aivencloud.com:22768` |
+- **Sales Prediction** — predict daily revenue for any of 1,115 Rossmann stores
+- **Store Metadata Enrichment** — automatically resolves StoreType, Assortment, CompetitionDistance, Promo2 intervals from a prebuilt store dictionary
+- **Web UI** — brutalist-styled interface with toggle switches for promo/holiday flags; toast notification confirms Kafka delivery after each prediction
+- **REST API** — programmatic access for integration and batch testing
+- **Real-time Kafka Pipeline** — full feature vector + prediction published per inference
+- **Synthetic Logger** — 1 Hz background job generates realistic store inputs and runs full inference, keeping the Kafka stream alive continuously
+- **Cloud-native** — deployed on Render, Kafka hosted on Aiven
 
-### Message Schema
+---
 
-Every prediction produces a Kafka message with this structure:
+## Model Details
+
+Trained on the [Rossmann Store Sales](https://www.kaggle.com/c/rossmann-store-sales) Kaggle dataset (~1 million rows, 1,115 stores).
+
+**Numerical features:** Store, Promo, SchoolHoliday, CompetitionDistance, CompetitionOpen, Promo2, Promo2Open, IsPromo2Month, Day, Month, Year, WeekOfYear
+
+**Categorical features (one-hot encoded):** DayOfWeek, StateHoliday, StoreType, Assortment
+
+**Preprocessing:** StandardScaler on numerical features, OneHotEncoder on categoricals — both fitted on training data and serialized alongside the model.
+
+---
+
+## Kafka Message Schema
+
+Every inference produces a message like this on the `rossman` topic:
 
 ```json
 {
@@ -67,108 +109,47 @@ Every prediction produces a Kafka message with this structure:
 }
 ```
 
-`data_source` is either `"user"` (real human input via web/API) or `"synthetic"` (auto-generated by the background scheduler).
+`data_source` is `"user"` for real predictions or `"synthetic"` for scheduler-generated ones.
 
-### Authentication
+---
 
-The app tries SSL client certificate auth first. If cert files are absent (e.g. on Render), it falls back to SASL_SSL using environment variables.
+## Reading Kafka Records
 
-Required files for SSL cert auth (place in project root, never commit):
+Aiven's REST proxy doesn't support the consumer API, so use `kafka-python` directly (requires the SSL certs).
 
-- `ca.pem` — CA certificate
-- `service.cert` — Access certificate
-- `service.key` — Access key (PKCS#8 format)
-
-### Test with cURL (REST Proxy)
-
+**Check total message count:**
 ```bash
-curl -u avnadmin:YOUR_PASSWORD \
-  -X POST https://kafka-23493bfd-aditya-fbdc.k.aivencloud.com:22768/topics/rossman \
-  -H "Content-Type: application/vnd.kafka.json.v2+json" \
-  -d '{"records":[{"value":{"message":"hello","source":"curl_test"}}]}'
+curl -s -u "$KAFKA_USER:$KAFKA_PASS" \
+  "https://kafka-23493bfd-aditya-fbdc.k.aivencloud.com:22768/topics/rossman/partitions/0/offsets"
 ```
 
-## Synthetic Data Logger
-
-A background APScheduler task runs every 10 seconds inside the Flask process:
-
-```text
-Every 10 seconds:
-  1. generate_random_input()  — random store, date, promo flags
-  2. decode_input()           — enrich with store metadata
-  3. model.predict()          — run XGBoost inference
-  4. log_prediction(..., data_source='synthetic')
-       └── Kafka produce → topic: rossman
-```
-
-This produces ~6 logged records per minute for continuous pipeline monitoring without requiring any human traffic.
-
-## Environment Variables
-
-### Local (`.env` file)
-
-```env
-# Kafka — SSL Client Cert (primary, local only)
-KAFKA_BOOTSTRAP_SERVER_SSL=kafka-23493bfd-aditya-fbdc.k.aivencloud.com:22766
-KAFKA_REST_PROXY_URL=https://kafka-23493bfd-aditya-fbdc.k.aivencloud.com:22768
-
-# Kafka — SASL_SSL (fallback, used on Render)
-KAFKA_BOOTSTRAP_SERVER=kafka-23493bfd-aditya-fbdc.k.aivencloud.com:22769
-KAFKA_USER=avnadmin
-KAFKA_PASS=your_kafka_password
-
-# Kafka topic
-KAFKA_TOPIC=rossman
-```
-
-### Render Dashboard
-
-Set these in Render → Web Service → **Environment**:
-
-| Key | Value |
-| :--- | :--- |
-| `KAFKA_BOOTSTRAP_SERVER` | `kafka-23493bfd-aditya-fbdc.k.aivencloud.com:22769` |
-| `KAFKA_USER` | `avnadmin` |
-| `KAFKA_PASS` | your Kafka password |
-| `KAFKA_TOPIC` | `rossman` |
-
-## Installation
-
-1. Clone the repository:
-
-   ```bash
-   git clone https://github.com/rautaditya2606/Rossman-Deployed.git
-   cd Rossman-Deployed
-   ```
-
-2. Create and activate a virtual environment:
-
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # Windows: venv\Scripts\activate
-   ```
-
-3. Install dependencies:
-
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. Add Kafka cert files (`ca.pem`, `service.cert`, `service.key`) to the project root.
-
-5. Create `.env` with your Kafka credentials (see above).
-
-## Usage
-
-### Web Interface
-
+**Read latest 100 records (requires `ca.pem`, `service.cert`, `service.key` in current dir):**
 ```bash
-python app.py
+python - <<'EOF'
+import json, os
+from kafka import KafkaConsumer, TopicPartition
+
+consumer = KafkaConsumer(
+    bootstrap_servers='kafka-23493bfd-aditya-fbdc.k.aivencloud.com:22766',
+    security_protocol='SSL', ssl_cafile='ca.pem',
+    ssl_certfile='service.cert', ssl_keyfile='service.key',
+    value_deserializer=lambda v: json.loads(v.decode()),
+    consumer_timeout_ms=5000, enable_auto_commit=False, group_id=None,
+)
+tp = TopicPartition('rossman', 0)
+consumer.assign([tp])
+end = consumer.end_offsets([tp])[tp]
+consumer.seek(tp, max(0, end - 100))
+for msg in consumer:
+    print(json.dumps(msg.value, indent=2))
+    if msg.offset >= end - 1: break
+consumer.close()
+EOF
 ```
 
-Navigate to `http://localhost:8080`. Fill in store details and click **Generate Prediction**. A toast notification will confirm the prediction was streamed to Kafka.
+---
 
-### REST API
+## REST API
 
 ```bash
 curl -X POST "https://rossman-deployed-xxk0.onrender.com/api/predictor" \
@@ -188,50 +169,95 @@ curl -X POST "https://rossman-deployed-xxk0.onrender.com/api/predictor" \
 { "prediction": 5263.45 }
 ```
 
-## Model Details
+---
 
-Built with XGBoost. Features used:
+## Local Setup
 
-**Numerical:** Store ID, Promo, SchoolHoliday, CompetitionDistance, CompetitionOpen, Promo2, Promo2Open, IsPromo2Month, Day, Month, Year, WeekOfYear
+1. Clone the repo:
 
-**Categorical (one-hot encoded):** DayOfWeek, StateHoliday, StoreType, Assortment
+   ```bash
+   git clone https://github.com/rautaditya2606/Rossman-Deployed.git
+   cd Rossman-Deployed
+   ```
+
+2. Create a virtual environment and install dependencies:
+
+   ```bash
+   python -m venv venv
+   source venv/bin/activate       # Windows: venv\Scripts\activate
+   pip install -r requirements.txt
+   ```
+
+3. Add Kafka credentials. For SSL cert auth (local), place in project root:
+   - `ca.pem` — CA certificate
+   - `service.cert` — access certificate
+   - `service.key` — access key (PKCS#8 format)
+
+4. Create a `.env` file:
+
+   ```env
+   KAFKA_BOOTSTRAP_SERVER_SSL=kafka-23493bfd-aditya-fbdc.k.aivencloud.com:22766
+   KAFKA_REST_PROXY_URL=https://kafka-23493bfd-aditya-fbdc.k.aivencloud.com:22768
+   KAFKA_BOOTSTRAP_SERVER=kafka-23493bfd-aditya-fbdc.k.aivencloud.com:22769
+   KAFKA_USER=avnadmin
+   KAFKA_PASS=your_kafka_password
+   KAFKA_TOPIC=rossman
+   ```
+
+5. Run:
+
+   ```bash
+   python app.py
+   ```
+
+   Navigate to `http://localhost:8080`.
+
+---
+
+## Deployment (Render)
+
+Set these environment variables in Render → Web Service → **Environment**:
+
+| Key | Value |
+| :--- | :--- |
+| `KAFKA_BOOTSTRAP_SERVER` | `kafka-23493bfd-aditya-fbdc.k.aivencloud.com:22769` |
+| `KAFKA_USER` | `avnadmin` |
+| `KAFKA_PASS` | your Kafka password |
+| `KAFKA_TOPIC` | `rossman` |
+
+Start command (or via `Procfile`):
+
+```bash
+gunicorn --workers 1 --preload --bind 0.0.0.0:$PORT app:app
+```
+
+---
 
 ## Project Structure
 
 ```text
 deploy_rossman/
-├── app.py                     # Flask app + APScheduler (10s synthetic logger)
-├── utils.py                   # log_prediction(), Kafka producer
-├── generate_synthetic_data.py # Random store input generator
+├── app.py                     # Flask app, APScheduler (1 Hz synthetic logger)
+├── utils.py                   # Feature decoding, Kafka producer (SSL + SASL fallback)
+├── generate_synthetic_data.py # Random input generator for synthetic inference
 ├── requirements.txt
-├── Dockerfile
-├── ca.pem                     # Aiven Kafka CA certificate (gitignored)
-├── service.cert               # Aiven Kafka access certificate (gitignored)
-├── service.key                # Aiven Kafka access key (gitignored)
-├── kafka_cert_producer.py     # Standalone SSL cert producer test
-├── kafka_sasl_producer.py     # Standalone SASL_SSL producer test
-├── kafka_rest_producer.py     # REST proxy producer test
-├── kafka_rest_consumer.py     # REST proxy consumer test
-├── kafka_test_consumer.py     # SASL_SSL consumer test
+├── Procfile                   # Render start command (single worker + preload)
 ├── model/
-│   ├── xgb_pipeline.joblib
-│   ├── scaler.joblib
-│   ├── encoder.joblib
-│   └── store_static_dict.joblib
+│   ├── xgb_pipeline.joblib    # Trained XGBoost model
+│   ├── scaler.joblib          # StandardScaler
+│   ├── encoder.joblib         # OneHotEncoder
+│   └── store_static_dict.joblib  # Per-store metadata lookup (1,115 stores)
 ├── static/
 ├── templates/
 │   └── index.html
 └── README.md
 ```
 
-## License
-
-This project is licensed under the MIT License.
+---
 
 ## Acknowledgments
 
-- [Rossmann Store Sales](https://www.kaggle.com/c/rossmann-store-sales) — Kaggle competition dataset
-- [XGBoost](https://xgboost.readthedocs.io/) — Gradient boosting library
-- [Flask](https://flask.palletsprojects.com/) — Web framework
-- [Aiven](https://aiven.io/) — Managed Kafka service
-- [Render](https://render.com/) — Cloud deployment platform
+- [Rossmann Store Sales](https://www.kaggle.com/c/rossmann-store-sales) — Kaggle dataset
+- [XGBoost](https://xgboost.readthedocs.io/) — gradient boosting library
+- [Aiven](https://aiven.io/) — managed Kafka
+- [Render](https://render.com/) — cloud deployment

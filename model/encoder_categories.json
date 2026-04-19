@@ -1,0 +1,28 @@
+{
+    "DayOfWeek": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+    ],
+    "StateHoliday": [
+        "0",
+        "a",
+        "b",
+        "c"
+    ],
+    "StoreType": [
+        "a",
+        "b",
+        "c",
+        "d"
+    ],
+    "Assortment": [
+        "a",
+        "b",
+        "c"
+    ]
+}
