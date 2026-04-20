@@ -16,55 +16,80 @@ Built to mirror how ML systems work in industry: not just a model, but a live in
 
 | Layer | Technology |
 | :--- | :--- |
-| Model | XGBoost (gradient boosting, sklearn pipeline) |
-| Backend | Python · Flask · Gunicorn |
-| Real-time Streaming | Apache Kafka (Aiven managed) · SSL + SASL_SSL auth |
-| Scheduler | Flask-APScheduler (1 Hz synthetic inference loop) |
-| Deployment | Render (memory-optimized: single worker + preload) |
-| Feature Engineering | pandas · numpy · scikit-learn (OHE + StandardScaler) |
+| **Model & Inference** | XGBoost (ONNX runtime for optimized inference) |
+| **Backend** | Python 3.11 · Flask · Gunicorn |
+| **Real-time Streaming** | Apache Kafka (Aiven managed) · REST Proxy & SASL/SSL |
+| **Data & Feature Eng.** | NumPy · Joblib · Scikit-learn (OHE + StandardScaler) |
+| **Monitoring** | Flask-APScheduler (1 Hz synthetic inference loop) |
+| **Containerization** | Docker · Render (Cloud Deployment) |
 
 ---
 
-## What Makes This Different
+## Key Features
 
-Most ML demos stop at a Jupyter notebook or a basic Streamlit app. This project goes further:
+- **Optimized Inference**: Converts XGBoost models to **ONNX** format for faster, memory-efficient predictions in resource-constrained environments (like Render's free tier).
+- **Hybrid Kafka Integration**: Robust reporting system that prefers direct SASL_SSL/SSL connections but seamlessly falls back to the **Kafka REST Proxy** for maximum portability across cloud environments.
+- **Continuous Observability**:
+  - **Live Inference Loop**: A background worker (APScheduler) generates 1 prediction per second, simulating real-world traffic.
+  - **Real-time Metrics**: View live message counts and partition offsets directly from the `/stats` endpoint.
+- **Automatic Feature Engineering**: Dynamically computes time-based features (e.g., `CompetitionOpen`, `IsPromo2Month`) from raw input and static store metadata.
 
-- **Real-time Kafka streaming** — every prediction is published to an Aiven Kafka topic with a full feature payload and timestamp, exactly as you would in a production ML monitoring system
-- **Dual auth strategy** — SSL client certificate auth locally, automatic SASL_SSL fallback on cloud (no code changes needed between environments)
-- **Continuous synthetic inference** — a background scheduler fires 1 prediction per second 24/7, producing ~3,600 logged records per hour for pipeline health monitoring without requiring any human traffic
-- **Memory-optimized deployment** — runs within a 512 MB cloud instance via single Gunicorn worker + `--preload` (OS-level copy-on-write sharing of the model across the process tree)
+---
+
+## Getting Started
+
+### 1. Environment Setup
+Create a `.env` file with your credentials:
+```env
+KAFKA_BOOTSTRAP_SERVER=your-kafka-server:port
+KAFKA_USER=your-username
+KAFKA_PASS=your-password
+KAFKA_TOPIC=rossman
+KAFKA_REST_PROXY_URL=your-rest-proxy-url
+```
+
+### 2. Run with Docker
+```bash
+docker build -t rossman-predictor .
+docker run -p 8080:8080 --env-file .env rossman-predictor
+```
+
+### 3. Local Development
+```bash
+pip install -r requirements.txt
+python app.py
+```
 
 ---
 
 ## Architecture
 
-```text
-                    ┌─────────────────────────────────┐
-                    │           Flask App              │
-                    │                                  │
-  HTTP Request ────►│  /         (Web UI)              │
-  REST API     ────►│  /api/predictor                  │
-  Scheduler ───────►│  APScheduler (1 req/sec)         │
-                    │                                  │
-                    │  decode_input()                  │
-                    │    └─ store metadata lookup      │
-                    │    └─ date feature engineering   │
-                    │    └─ scaler + OHE transform     │
-                    │                                  │
-                    │  XGBoost model.predict()         │
-                    │                                  │
-                    │  log_prediction()                │
-                    │    ├─ SSL Client Cert  (local)   │
-                    │    └─ SASL_SSL fallback (cloud)  │
-                    └──────────────┬──────────────────┘
-                                   │
-                                   ▼
-                    ┌──────────────────────────────────┐
-                    │       Aiven Kafka Cluster        │
-                    │       topic: rossman             │
-                    │       ~3,600 msgs/hour           │
-                    └──────────────────────────────────┘
+```mermaid
+graph TD
+    User([User / API Client]) -->|HTTP Request| Flask[Flask Application]
+    Scheduler[APScheduler - 1Hz] -->|Synthetic Data| Flask
+    
+    subgraph "Inference Pipeline"
+        Flask --> Decode[decode_input]
+        Decode --> Meta[Store Metadata Lookup]
+        Meta --> FE[Feature Engineering]
+        FE --> Scale[Scaler + OHE Transform]
+        Scale --> ONNX[ONNX Runtime - XGBoost]
+    end
+    
+    ONNX --> Log[log_prediction]
+    
+    subgraph "Streaming Layer"
+        Log -->|Direct| Producer[Kafka Producer SASL/SSL]
+        Log -->|Fallback| REST[Kafka REST Proxy]
+        Producer --> Kafka[Aiven Kafka Cluster]
+        REST --> Kafka
+    end
+
+    style Kafka fill:#f96,stroke:#333,stroke-width:2px
+    style Flask fill:#69f,stroke:#333,stroke-width:2px
 ```
+
 
 ---
 
